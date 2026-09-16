@@ -33,3 +33,8 @@ supabase/.env
 Thumbs.db
 .vscode/
 .idea/
+
+# python build artefacts
+*.egg-info/
+build/
+dist/
