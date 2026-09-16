@@ -1,0 +1,69 @@
+"""Herbal Evidence API.
+
+Phase 1: the service boots, reports its health, and nothing else. Auth, the
+request journey, the research workflow and the job queue arrive in later phases.
+"""
+
+import logging
+
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
+
+from app.config import get_settings
+
+settings = get_settings()
+
+logging.basicConfig(level=settings.log_level)
+logger = logging.getLogger("herbal_evidence")
+
+app = FastAPI(
+    title="Herbal Evidence API",
+    version="0.1.0",
+    docs_url="/docs" if settings.is_dev else None,
+    redoc_url=None,
+    openapi_url="/openapi.json" if settings.is_dev else None,
+)
+
+if settings.allowed_origins:
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=settings.allowed_origins,
+        allow_credentials=True,
+        allow_methods=["GET", "POST", "PATCH", "DELETE"],
+        allow_headers=["Authorization", "Content-Type"],
+    )
+else:
+    logger.warning(
+        "No CORS origins configured; browser calls from the frontend will be rejected."
+    )
+
+
+class Health(BaseModel):
+    status: str
+    app_env: str
+    version: str
+
+
+class Ready(BaseModel):
+    ready: bool
+    checks: dict[str, str]
+
+
+@app.get("/health", response_model=Health, tags=["ops"])
+def health() -> Health:
+    """Liveness. Says nothing about dependencies and exposes no secrets."""
+    return Health(status="ok", app_env=settings.app_env, version=app.version)
+
+
+@app.get("/ready", response_model=Ready, tags=["ops"])
+def ready() -> Ready:
+    """Readiness. Reports whether configuration is present, never its values."""
+    checks = {
+        "supabase_url": "set" if settings.supabase_url else "missing",
+        "supabase_secret_key": "set" if settings.supabase_secret_key else "missing",
+        "cors_origins": "set" if settings.allowed_origins else "missing",
+        "ai_provider": settings.ai_provider,
+    }
+    # Phase 1 has no database yet, so readiness is configuration-only.
+    return Ready(ready=True, checks=checks)

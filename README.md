@@ -22,12 +22,49 @@ The platform does **not** recommend which herb to take, does not prescribe doses
 
 Details and setup steps: see `docs/deployment.md`. Development status per phase is tracked in the project's Obsidian vault (`HERBAL_EVIDENCE_PROJECT/`).
 
-## Local development (filled in as phases complete)
+## Local development
 
-1. `supabase start` (Phase 1)
-2. `cd backend && uv sync && uv run uvicorn app.main:app --reload` (Phase 2)
-3. `cd frontend && npx serve .` (Phase 4)
+No Docker and no `uv` on the current machine — see `docs/decisions.md` D-015 to D-017.
+
+**Backend** (Python 3.12+):
+
+```bash
+cd backend
+python -m venv .venv
+.venv/Scripts/python -m pip install -e ".[dev]"
+.venv/Scripts/python -m pytest -q
+.venv/Scripts/python -m uvicorn app.main:app --reload --port 8000
+```
+
+`GET /health` returns liveness. `GET /ready` reports which configuration is present
+("set" / "missing") and never a value.
+
+**Frontend** (any static server):
+
+```bash
+cd frontend
+python -m http.server 4173
+```
+
+`config.js` in the repo holds local defaults. In the container it is rewritten from
+environment variables by `entrypoint.sh` — public values only.
+
+**Supabase**: remote-only. `npx supabase db push --linked` against the `dev` project.
+`supabase start` and `db diff` need Docker and are unavailable here.
 
 ## Status
 
-Phase 0 (foundation) — in progress. See `docs/decisions.md` for engineering choices.
+**Phase 1 — skeleton. Done and verified locally:**
+
+| Item | State |
+|------|-------|
+| `dev` branch created from `main` | ✅ |
+| Backend: FastAPI, `/health`, `/ready`, CORS from env, Dockerfile | ✅ 2 tests pass |
+| Frontend: Hebrew RTL landing page, Caddy Dockerfile, runtime config | ✅ renders, desktop + mobile |
+| Supabase schema, Auth, RLS | ⬜ phase 3 |
+| Railway services | ⬜ phase 7 |
+
+Neither Dockerfile has been built — Docker is not installed here (D-016).
+
+Phase plan and progress: Obsidian vault, `Herbal Evidence/תוכנית שלבים`.
+Engineering choices: `docs/decisions.md`.
