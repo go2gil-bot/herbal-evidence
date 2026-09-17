@@ -27,7 +27,13 @@ from app.services.supabase_client import SupabaseClient
 
 logger = logging.getLogger("herbal_evidence.worker")
 
-IDLE_SLEEP_SECONDS = 5.0
+# An idle worker backs off instead of polling at a fixed rate. At 5s flat this
+# sends ~17k requests a day per environment to ask an empty queue the same
+# question; backing off to a minute costs at most 55 seconds of latency on the
+# first job after a quiet spell, and the enqueue path is not latency-critical -
+# the requester is told there is no guaranteed turnaround time.
+IDLE_SLEEP_MIN_SECONDS = 5.0
+IDLE_SLEEP_MAX_SECONDS = 60.0
 HEARTBEAT_SECONDS = 60.0
 
 
@@ -98,6 +104,8 @@ async def run_forever(stop: asyncio.Event) -> None:
     worker = worker_name()
     logger.info("job worker %s started", worker)
 
+    idle_sleep = IDLE_SLEEP_MIN_SECONDS
+
     while not stop.is_set():
         try:
             did_work = await process_one(client, worker)
@@ -106,8 +114,13 @@ async def run_forever(stop: asyncio.Event) -> None:
             logger.exception("worker loop error")
             did_work = False
 
-        if not did_work:
-            with contextlib.suppress(asyncio.TimeoutError):
-                await asyncio.wait_for(stop.wait(), timeout=IDLE_SLEEP_SECONDS)
+        if did_work:
+            # More work usually arrives in bursts, so go back to polling fast.
+            idle_sleep = IDLE_SLEEP_MIN_SECONDS
+            continue
+
+        with contextlib.suppress(asyncio.TimeoutError):
+            await asyncio.wait_for(stop.wait(), timeout=idle_sleep)
+        idle_sleep = min(idle_sleep * 2, IDLE_SLEEP_MAX_SECONDS)
 
     logger.info("job worker %s stopped", worker)
