@@ -194,28 +194,40 @@ non-interactive push defaults to proceeding, so the diff is the only review step
 
 Supabase's built-in email sender is rate limited to a handful of messages per
 hour and is documented as being for testing only. **Registration works, but the
-verification email will often not arrive.** Until an SMTP provider is configured,
-do not open the production site to real users.
+verification email will often not arrive.** Until SMTP is configured, do not open
+the production site to real users.
 
-To finish it:
+Chosen provider: **Brevo** (free tier, 300 messages/day, no domain required).
 
-1. Choose a provider and create an account there. A pilot needs very little
-   volume; the deciding factor is usually whether you have a domain to send from.
-2. Put the credentials in `supabase/.env` (gitignored):
+1. In Brevo: verify a sender address, then create an **SMTP key** under
+   SMTP & API. The SMTP login is usually `something@smtp-brevo.com` - it is not
+   the account email - and the password is that key, not the account password.
+2. Put four values in `supabase/.env` (gitignored):
 
    ```
-   SMTP_HOST=...
-   SMTP_USER=...
-   SMTP_PASS=...
-   SMTP_SENDER=no-reply@yourdomain
+   SMTP_HOST=smtp-relay.brevo.com
+   SMTP_USER=<the SMTP login Brevo shows>
+   SMTP_PASS=<the SMTP key>
+   SMTP_SENDER=<the verified sender address>
    ```
 
-3. Uncomment the `[auth.email.smtp]` block at the bottom of
-   `supabase/config.toml`, and export those four variables in
-   `scripts/auth-config.sh` for each environment.
-4. `scripts/auth-config.sh dev diff`, read it, then `push`. Test a real
-   registration on dev before touching production.
+3. `scripts/auth-config.sh dev diff`, read it, then `push`.
+4. Register a real address on dev and confirm the email arrives before touching
+   production.
 
-The block is commented rather than declared-and-empty on purpose: a declared
-empty SMTP block would be pushed as empty and would break sending rather than
-leave it alone.
+The script includes `supabase/config.smtp.toml` **only when all four variables
+are non-empty**. This is not caution for its own sake: with a variable missing,
+the CLI passes `env(SMTP_HOST)` through as that literal string and still sets
+`enabled = true`, so a half-configured push enables SMTP with nonsense and breaks
+sending outright. All four, or none.
+
+#### Deliverability without a domain
+
+Sending from a free webmail address (`@gmail.com`, `@outlook.com`) through a
+third-party relay fails those providers' DMARC policy, so messages are commonly
+rejected or filed as spam by the recipient. Brevo restricts this for that reason.
+
+For a small pilot where participants are told to expect the email, this is
+usually survivable. For anything wider, a domain - about $10/year - plus the DNS
+records Brevo asks for is the actual fix, and it is the difference between
+"verification emails work" and "verification emails sometimes work".

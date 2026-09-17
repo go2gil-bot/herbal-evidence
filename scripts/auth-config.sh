@@ -5,10 +5,16 @@
 #   scripts/auth-config.sh dev push
 #   scripts/auth-config.sh production diff
 #
-# Always run `diff` and read it before `push`. A non-interactive push defaults
-# to proceeding, so the diff is the only real review step.
+# Always run `diff` and read it before `push`. A non-interactive push defaults to
+# proceeding, so the diff is the only real review step.
+#
+# SMTP is included only when all four variables are set in supabase/.env. With a
+# variable missing, the CLI passes "env(SMTP_HOST)" through as a literal string
+# and still sets enabled = true, so a half-configured push would enable SMTP with
+# nonsense and break sending. Hence: all four, or none.
 set -euo pipefail
 
+REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 ENVIRONMENT="${1:-}"
 ACTION="${2:-diff}"
 
@@ -34,8 +40,28 @@ case "$ENVIRONMENT" in
     ;;
 esac
 
+# Secrets come from the gitignored env file and are never echoed.
+if [ -f "$REPO/supabase/.env" ]; then
+  set -a
+  # shellcheck disable=SC1091
+  . "$REPO/supabase/.env"
+  set +a
+fi
+
+WORKDIR="$(mktemp -d)"
+trap 'rm -rf "$WORKDIR"' EXIT
+mkdir -p "$WORKDIR/supabase"
+cp "$REPO/supabase/config.toml" "$WORKDIR/supabase/config.toml"
+
+if [ -n "${SMTP_HOST:-}" ] && [ -n "${SMTP_USER:-}" ] && [ -n "${SMTP_PASS:-}" ] && [ -n "${SMTP_SENDER:-}" ]; then
+  cat "$REPO/supabase/config.smtp.toml" >> "$WORKDIR/supabase/config.toml"
+  echo "SMTP: all four variables present, including the smtp block" >&2
+else
+  echo "SMTP: not configured, leaving the remote sender untouched" >&2
+fi
+
 case "$ACTION" in
-  diff) npx --yes supabase@latest config diff --project-ref "$SUPABASE_PROJECT_REF" ;;
-  push) npx --yes supabase@latest config push --project-ref "$SUPABASE_PROJECT_REF" --yes ;;
+  diff) npx --yes supabase@latest config diff --workdir "$WORKDIR" --project-ref "$SUPABASE_PROJECT_REF" ;;
+  push) npx --yes supabase@latest config push --workdir "$WORKDIR" --project-ref "$SUPABASE_PROJECT_REF" --yes ;;
   *) echo "action must be diff or push" >&2; exit 2 ;;
 esac
