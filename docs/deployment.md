@@ -202,13 +202,19 @@ Chosen provider: **Brevo** (free tier, 300 messages/day, no domain required).
 1. In Brevo: verify a sender address, then create an **SMTP key** under
    SMTP & API. The SMTP login is usually `something@smtp-brevo.com` - it is not
    the account email - and the password is that key, not the account password.
-2. Put four values in `supabase/.env` (gitignored):
+2. Put the values in `supabase/.env` (gitignored), **per environment** - generate
+   a separate SMTP key for each, so revoking one does not stop the other sending:
 
    ```
    SMTP_HOST=smtp-relay.brevo.com
-   SMTP_USER=<the SMTP login Brevo shows>
-   SMTP_PASS=<the SMTP key>
-   SMTP_SENDER=<the verified sender address>
+
+   DEV_SMTP_USER=<the SMTP login Brevo shows>
+   DEV_SMTP_PASS=<the key for the dev SMTP key>
+   DEV_SMTP_SENDER=<the verified sender address>
+
+   PROD_SMTP_USER=<the SMTP login Brevo shows>
+   PROD_SMTP_PASS=<the key for the production SMTP key>
+   PROD_SMTP_SENDER=<the verified sender address>
    ```
 
 3. `scripts/auth-config.sh dev diff`, read it, then `push`.
@@ -220,6 +226,18 @@ are non-empty**. This is not caution for its own sake: with a variable missing,
 the CLI passes `env(SMTP_HOST)` through as that literal string and still sets
 `enabled = true`, so a half-configured push enables SMTP with nonsense and breaks
 sending outright. All four, or none.
+
+#### Two things that will silently stop sending
+
+- **Brevo requires phone verification** before it will send anything. Without it
+  the relay accepts the connection and nothing arrives, which reads like a
+  configuration bug and is not one.
+- **An SMTP key expires after 90 days of inactivity**, regardless of the expiry
+  date chosen. A pilot that pauses for a quarter comes back with dead credentials.
+
+Do **not** enable Brevo's "block unauthorized IP addresses for SMTP keys". The
+backend runs on Railway and its egress address changes between deploys; turning
+that on breaks sending the first time a container moves.
 
 #### Deliverability without a domain
 
