@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>שאלון הבנה — Herbal Evidence</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+Hebrew:wght@400;600;700&family=Noto+Sans:wght@400;600&display=swap">
+  <link rel="stylesheet" href="styles.css?v=3">
+  <style>
+    .steps-bar { display: flex; gap: .5rem; margin-bottom: 1.5rem; }
+    .steps-bar span {
+      flex: 1; text-align: center; padding: .4rem; border-radius: var(--radius);
+      border: 1px solid var(--line); font-size: .85rem; color: var(--ink-500);
+    }
+    .steps-bar span[aria-current="step"] {
+      border-color: var(--green-600); color: var(--green-700); font-weight: 600;
+      background: var(--green-50);
+    }
+    fieldset { border: 1px solid var(--line); border-radius: var(--radius); padding: 1rem 1.2rem; margin-block: 1rem; }
+    legend { font-weight: 600; padding-inline: .4rem; }
+    fieldset .hint { display: block; margin-bottom: .6rem; }
+    fieldset label { display: flex; gap: .5rem; align-items: baseline; margin-block: .45rem; cursor: pointer; }
+    fieldset input { inline-size: auto; }
+  </style>
+</head>
+<body>
+  <div class="env-banner" id="env-banner" hidden>סביבת פיתוח (dev) — הנתונים כאן אינם אמיתיים</div>
+
+  <header class="site-header">
+    <div class="wrap">
+      <div class="brand"><a href="dashboard.html" style="color:inherit;text-decoration:none">Herbal Evidence</a><span>שאלון הבנה</span></div>
+      <nav><a class="btn btn-quiet" id="back" href="dashboard.html">חזרה</a></nav>
+    </div>
+  </header>
+
+  <main class="page wrap">
+    <p class="form-error" id="error" hidden></p>
+    <div class="loading" id="loading">טוען…</div>
+
+    <div id="content" hidden>
+      <div class="steps-bar" id="steps">
+        <span id="step-pre" aria-current="step">לפני הקריאה</span>
+        <span id="step-read">קריאת התשובה</span>
+        <span id="step-post">אחרי הקריאה</span>
+      </div>
+
+      <!-- step 1 -->
+      <section id="phase-pre">
+        <h1>כמה שאלות לפני שתקרא/י</h1>
+        <p class="lede">
+          אנחנו בודקים אם התשובות שלנו מובנות — לא אותך. אין תשובה "נכונה" שמשקפת עליך משהו,
+          ואפשר לבחור "לא הצלחתי להבין" בכל שאלה. זה בדיוק סוג המידע שעוזר לנו.
+        </p>
+        <form class="panel wide" id="form-pre"></form>
+      </section>
+
+      <!-- step 2 -->
+      <section id="phase-read" hidden>
+        <h1>התשובה שלך</h1>
+        <p class="lede">קרא/י בקצב שלך. אחר כך נשאל את אותן שאלות שוב.</p>
+        <div id="response-body"></div>
+        <button class="btn btn-primary" type="button" id="finished-reading" style="margin-top:1.5rem">
+          סיימתי לקרוא
+        </button>
+      </section>
+
+      <!-- step 3 -->
+      <section id="phase-post" hidden>
+        <h1>אותן שאלות, אחרי הקריאה</h1>
+        <p class="lede">אותן ארבע שאלות. אפשר לשנות תשובה או להשאיר אותה.</p>
+        <form class="panel wide" id="form-post"></form>
+      </section>
+
+      <!-- done -->
+      <section id="phase-done" hidden>
+        <h1>תודה</h1>
+        <div class="panel wide">
+          <p id="done-message"></p>
+          <p class="hint">התשובות שלך נשמרו ומשמשות לשיפור האופן שבו אנחנו כותבים.</p>
+          <a class="btn btn-primary" id="done-link" href="dashboard.html">חזרה לבקשות שלי</a>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <script src="config.js"></script>
+  <script src="core.js?v=3"></script>
+  <script>
+    (function () {
+      "use strict";
+      HE.markDevEnvironment();
+      if (!HE.auth.requireSession()) return;
+
+      var params = new URLSearchParams(location.search);
+      var requestId = params.get("id");
+      var errorBox = document.getElementById("error");
+      var questions = [];
+      var responseVersionId = null;
+
+      if (!requestId || !/^\d+$/.test(requestId)) {
+        document.getElementById("loading").hidden = true;
+        HE.showError(errorBox, "מזהה בקשה לא תקין.");
+        return;
+      }
+      document.getElementById("back").href = "request.html?id=" + encodeURIComponent(requestId);
+      document.getElementById("done-link").href = "request.html?id=" + encodeURIComponent(requestId);
+
+      function fail(err) {
+        HE.showError(errorBox, (err && err.message) || "שגיאה.");
+      }
+
+      function renderQuestions(form, phase) {
+        form.textContent = "";
+        questions.forEach(function (question) {
+          var fieldset = document.createElement("fieldset");
+          var legend = document.createElement("legend");
+          legend.textContent = question.text;
+          fieldset.append(legend);
+
+          if (question.help) {
+            var help = document.createElement("span");
+            help.className = "hint";
+            help.textContent = question.help;
+            fieldset.append(help);
+          }
+
+          question.options.forEach(function (option) {
+            var label = document.createElement("label");
+            var radio = document.createElement("input");
+            radio.type = "radio";
+            radio.name = phase + "-" + question.id;
+            radio.value = option.id;
+            radio.required = true;
+            var text = document.createElement("span");
+            text.textContent = option.text;
+            label.append(radio, text);
+            fieldset.append(label);
+          });
+          form.append(fieldset);
+        });
+
+        var submit = document.createElement("button");
+        submit.className = "btn btn-primary";
+        submit.type = "submit";
+        submit.textContent = "שליחה";
+        form.append(submit);
+      }
+
+      function collect(form, phase) {
+        var answers = {};
+        questions.forEach(function (question) {
+          var picked = form.querySelector('input[name="' + phase + "-" + question.id + '"]:checked');
+          if (picked) answers[question.id] = picked.value;
+        });
+        return answers;
+      }
+
+      function step(name) {
+        ["pre", "read", "post", "done"].forEach(function (other) {
+          var section = document.getElementById("phase-" + other);
+          if (section) section.hidden = other !== name;
+        });
+        ["pre", "read", "post"].forEach(function (other) {
+          var marker = document.getElementById("step-" + other);
+          if (marker) marker.setAttribute("aria-current", other === name ? "step" : "false");
+        });
+        window.scrollTo(0, 0);
+      }
+
+      function card(heading, text, className) {
+        var section = document.createElement("section");
+        section.className = "response-card" + (className ? " " + className : "");
+        if (heading) {
+          var h3 = document.createElement("h3");
+          h3.textContent = heading;
+          section.append(h3);
+        }
+        var p = document.createElement("p");
+        p.textContent = text;
+        section.append(p);
+        return section;
+      }
+
+      function renderResponse(response) {
+        var container = document.getElementById("response-body");
+        var body = response.body || {};
+        container.textContent = "";
+
+        if (body.question) container.append(card("השאלה שנבדקה", body.question));
+        if (body.conclusion) container.append(card("מסקנה קצרה", body.conclusion, "lead"));
+
+        if (body.certainty || body.certainty_explanation) {
+          var certainty = document.createElement("section");
+          certainty.className = "response-card";
+          var h3 = document.createElement("h3");
+          h3.textContent = "רמת ודאות הראיות";
+          certainty.append(h3);
+          if (body.certainty) {
+            var level = document.createElement("p");
+            level.style.fontWeight = "700";
+            level.textContent = body.certainty;
+            certainty.append(level);
+          }
+          if (body.certainty_explanation) {
+            var explanation = document.createElement("p");
+            explanation.textContent = body.certainty_explanation;
+            certainty.append(explanation);
+          }
+          container.append(certainty);
+        }
+
+        if (body.appetite_results) container.append(card("תוצאות לגבי תיאבון", body.appetite_results));
+        if (body.secondary_outcomes) container.append(card("תוצאים משניים", body.secondary_outcomes));
+        if (body.safety) container.append(card("מידע בטיחות", body.safety));
+        if (body.limitations) container.append(card("מגבלות", body.limitations));
+
+        if (body.preclinical) {
+          var preclinical = card(null, body.preclinical, "secondary");
+          var caveat = document.createElement("p");
+          caveat.className = "caveat";
+          caveat.textContent = "מחקרי מעבדה ובעלי חיים — אינם עדות לתועלת בבני אדם";
+          preclinical.prepend(caveat);
+          container.append(preclinical);
+        }
+      }
+
+      Promise.all([
+        HE.api.pilot.questionnaire(),
+        HE.api.getRequest(requestId)
+      ]).then(function (results) {
+        var sheet = results[0];
+        var detail = results[1];
+
+        if (!detail.has_response) {
+          throw Object.assign(new Error("אין עדיין תשובה מאושרת לבקשה הזו."), { status: 404 });
+        }
+        questions = sheet.questions;
+
+        return HE.api.getResponse(requestId).then(function (response) {
+          responseVersionId = response.version_id || null;
+          document.getElementById("loading").hidden = true;
+          document.getElementById("content").hidden = false;
+
+          renderQuestions(document.getElementById("form-pre"), "pre");
+          renderQuestions(document.getElementById("form-post"), "post");
+          renderResponse(response);
+          window.__response = response;
+        });
+      }).catch(function (err) {
+        document.getElementById("loading").hidden = true;
+        fail(err);
+      });
+
+      function submitPhase(form, phase, next) {
+        form.addEventListener("submit", function (event) {
+          event.preventDefault();
+          HE.clearError(errorBox);
+          var answers = collect(form, phase);
+          if (Object.keys(answers).length < questions.length) {
+            HE.showError(errorBox, "יש לענות על כל השאלות.");
+            return;
+          }
+          var button = form.querySelector('button[type="submit"]');
+          button.disabled = true;
+
+          HE.api.pilot.submit({
+            response_version_id: (window.__response || {}).version_id || responseVersionId,
+            phase: phase,
+            answers: answers
+          }).then(function (result) {
+            next(result);
+          }).catch(function (err) {
+            button.disabled = false;
+            if (err.code === "already_answered") {
+              next({ message: "כבר ענית על השלב הזה." });
+            } else {
+              fail(err);
+            }
+          });
+        });
+      }
+
+      submitPhase(document.getElementById("form-pre"), "pre", function () { step("read"); });
+      submitPhase(document.getElementById("form-post"), "post", function (result) {
+        document.getElementById("done-message").textContent =
+          (result && result.message) || "התשובות נשמרו.";
+        step("done");
+      });
+
+      document.getElementById("finished-reading").addEventListener("click", function () {
+        step("post");
+      });
+    })();
+  </script>
+</body>
+</html>

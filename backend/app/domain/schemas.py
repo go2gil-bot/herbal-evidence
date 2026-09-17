@@ -92,6 +92,9 @@ class ClarificationAnswer(BaseModel):
 class ApprovedResponse(BaseModel):
     """An approved, published response. A draft can never be serialised here."""
 
+    # The pilot questionnaire is answered about one exact version, so the reader
+    # needs its id. Scoping still applies: only the owner ever reaches this.
+    version_id: int
     request_id: int
     version: int
     published_at: datetime

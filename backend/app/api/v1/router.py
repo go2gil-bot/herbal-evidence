@@ -247,7 +247,7 @@ async def get_approved_response(
 
     rows = await client.select(
         "response_versions",
-        columns="request_id,version,body,published_at",
+        columns="id,request_id,version,body,published_at",
         # 'published' is not a convenience filter, it is the rule: a draft, a
         # superseded version and a withdrawn version are all unreachable here.
         filters={"request_id": f"eq.{request_id}", "state": "eq.published"},
@@ -255,4 +255,5 @@ async def get_approved_response(
     )
     if not rows:
         raise NOT_FOUND
-    return ApprovedResponse(**rows[0])
+    row = rows[0]
+    return ApprovedResponse(version_id=row.pop("id"), **row)
