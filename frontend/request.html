@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>בקשה — Herbal Evidence</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+Hebrew:wght@400;600;700&family=Noto+Sans:wght@400;600&display=swap">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="env-banner" id="env-banner" hidden>סביבת פיתוח (dev) — הנתונים כאן אינם אמיתיים</div>
+
+  <header class="site-header">
+    <div class="wrap">
+      <div class="brand"><a href="index.html" style="color:inherit;text-decoration:none">Herbal Evidence</a><span>סקירת ראיות על צמחי מרפא ותיאבון</span></div>
+      <nav><a class="btn btn-quiet" href="dashboard.html">הבקשות שלי</a></nav>
+    </div>
+  </header>
+
+  <main class="page wrap">
+    <p class="form-error" id="error" hidden></p>
+    <div class="loading" id="loading">טוען…</div>
+
+    <div id="content" hidden>
+      <p class="form-note" id="new-note" hidden>הבקשה נשלחה. שמרנו אותה בחשבון שלך.</p>
+
+      <h1 id="title"></h1>
+      <p><span class="status" id="status"></span></p>
+
+      <section class="panel wide">
+        <h2 style="font-size:1.05rem;margin:0 0 1rem">מה נשלח</h2>
+        <dl class="summary-grid" id="summary"></dl>
+      </section>
+
+      <section id="waiting" class="waiting" hidden>
+        <p style="margin:0">
+          הבקשה שלך ממתינה לבדיקת צוות המחקר. אין כרגע זמן טיפול מובטח.
+          התשובה שלך תופיע כאן לאחר אישור.
+        </p>
+      </section>
+
+      <section id="closed" class="waiting" hidden>
+        <p style="margin:0"><strong>הבקשה נסגרה.</strong> <span id="closed-reason"></span></p>
+      </section>
+
+      <section id="clarifications" hidden>
+        <h2 style="font-size:1.2rem">שאלות הבהרה</h2>
+        <div id="clarification-list"></div>
+      </section>
+
+      <section id="response" hidden>
+        <h2 style="font-size:1.4rem;margin-top:2.5rem">התשובה</h2>
+        <p class="hint" id="response-meta"></p>
+        <div id="response-body"></div>
+      </section>
+    </div>
+  </main>
+
+  <script src="config.js"></script>
+  <script src="core.js"></script>
+  <script>
+    (function () {
+      "use strict";
+      HE.markDevEnvironment();
+      if (!HE.auth.requireSession()) return;
+
+      var params = new URLSearchParams(location.search);
+      var requestId = params.get("id");
+      var errorBox = document.getElementById("error");
+      var loading = document.getElementById("loading");
+
+      if (!requestId || !/^\d+$/.test(requestId)) {
+        loading.hidden = true;
+        HE.showError(errorBox, "מזהה בקשה לא תקין.");
+        return;
+      }
+
+      if (params.get("new")) document.getElementById("new-note").hidden = false;
+
+      function addRow(dl, term, value) {
+        if (value === null || value === undefined || value === "") return;
+        var dt = document.createElement("dt");
+        dt.textContent = term;
+        var dd = document.createElement("dd");
+        if (value instanceof Node) dd.append(value); else dd.textContent = value;
+        dl.append(dt, dd);
+      }
+
+      function renderClarifications(detail) {
+        if (!detail.clarifications.length) return;
+        var section = document.getElementById("clarifications");
+        var container = document.getElementById("clarification-list");
+        section.hidden = false;
+
+        detail.clarifications.forEach(function (item) {
+          var panel = document.createElement("section");
+          panel.className = "panel wide";
+          panel.style.marginBottom = "1rem";
+
+          var question = document.createElement("p");
+          question.style.fontWeight = "600";
+          question.textContent = item.question;
+          panel.append(question);
+
+          if (item.answer) {
+            var answered = document.createElement("p");
+            answered.className = "answered";
+            answered.textContent = "התשובה שלך: " + item.answer;
+            panel.append(answered);
+          } else {
+            // A short structured form, not a chat.
+            var form = document.createElement("form");
+            form.className = "answer-section";
+
+            var label = document.createElement("label");
+            label.setAttribute("for", "answer-" + item.id);
+            label.textContent = "התשובה שלך";
+            label.style.fontWeight = "600";
+
+            var textarea = document.createElement("textarea");
+            textarea.id = "answer-" + item.id;
+            textarea.maxLength = 2000;
+            textarea.required = true;
+
+            var submit = document.createElement("button");
+            submit.className = "btn btn-primary";
+            submit.type = "submit";
+            submit.textContent = "שליחת התשובה";
+            submit.style.marginTop = ".8rem";
+
+            form.append(label, textarea, submit);
+            form.addEventListener("submit", function (event) {
+              event.preventDefault();
+              if (!textarea.value.trim()) return;
+              submit.disabled = true;
+              HE.api.answerClarification(requestId, item.id, textarea.value.trim())
+                .then(function () { location.reload(); })
+                .catch(function (err) {
+                  submit.disabled = false;
+                  HE.showError(errorBox, err.message || "לא ניתן היה לשלוח את התשובה.");
+                });
+            });
+            panel.append(form);
+          }
+          container.append(panel);
+        });
+      }
+
+      function card(heading, text, className) {
+        var section = document.createElement("section");
+        section.className = "response-card" + (className ? " " + className : "");
+        if (heading) {
+          var h3 = document.createElement("h3");
+          h3.textContent = heading;
+          section.append(h3);
+        }
+        var p = document.createElement("p");
+        p.textContent = text;
+        section.append(p);
+        return section;
+      }
+
+      function renderResponse(response) {
+        var section = document.getElementById("response");
+        var container = document.getElementById("response-body");
+        var body = response.body || {};
+
+        document.getElementById("response-meta").textContent =
+          "גרסה " + response.version + " · פורסמה " + HE.formatDate(response.published_at);
+
+        if (body.question) container.append(card("השאלה שנבדקה", body.question));
+        if (body.conclusion) container.append(card("מסקנה קצרה", body.conclusion, "lead"));
+
+        if (body.certainty || body.certainty_explanation) {
+          var certainty = document.createElement("section");
+          certainty.className = "response-card";
+          var h3 = document.createElement("h3");
+          h3.textContent = "רמת ודאות הראיות";
+          certainty.append(h3);
+          if (body.certainty) {
+            var level = document.createElement("p");
+            level.style.fontWeight = "700";
+            // A word, never a score, never colour alone.
+            level.textContent = body.certainty;
+            certainty.append(level);
+          }
+          if (body.certainty_explanation) {
+            var explanation = document.createElement("p");
+            explanation.textContent = body.certainty_explanation;
+            certainty.append(explanation);
+          }
+          container.append(certainty);
+        }
+
+        if (body.safety) container.append(card("מידע בטיחות", body.safety));
+        if (body.limitations) container.append(card("מגבלות", body.limitations));
+
+        if (body.preclinical) {
+          var preclinical = card(null, body.preclinical, "secondary");
+          var caveat = document.createElement("p");
+          caveat.className = "caveat";
+          caveat.textContent = "מחקרי מעבדה ובעלי חיים — אינם עדות לתועלת בבני אדם";
+          preclinical.prepend(caveat);
+          container.append(preclinical);
+        }
+
+        if (Array.isArray(body.sources) && body.sources.length) {
+          var sources = document.createElement("section");
+          sources.className = "response-card";
+          var sh = document.createElement("h3");
+          sh.textContent = "מקורות";
+          sources.append(sh);
+          var ol = document.createElement("ol");
+          body.sources.forEach(function (source) {
+            var li = document.createElement("li");
+            li.append(HE.ltr(source.title || ""));
+            if (source.identifier) {
+              li.append(" ");
+              li.append(HE.ltr(source.identifier));
+            }
+            if (source.access) {
+              var tag = document.createElement("span");
+              tag.className = "status";
+              tag.style.marginInlineStart = ".5rem";
+              tag.textContent = source.access === "abstract_only" ? "תקציר בלבד" : "טקסט מלא";
+              li.append(tag);
+            }
+            ol.append(li);
+          });
+          sources.append(ol);
+          container.append(sources);
+        }
+
+        if (body.approved_by || body.approval_date || body.search_date) {
+          var signature = document.createElement("p");
+          signature.className = "hint";
+          var parts = [];
+          if (body.approved_by) parts.push("אושר על ידי: " + body.approved_by);
+          if (body.approval_date) parts.push("תאריך אישור: " + body.approval_date);
+          if (body.search_date) parts.push("תאריך חיפוש ספרות: " + body.search_date);
+          signature.textContent = parts.join(" · ");
+          container.append(signature);
+        }
+
+        section.hidden = false;
+      }
+
+      HE.api.getRequest(requestId).then(function (detail) {
+        loading.hidden = true;
+        document.getElementById("content").hidden = false;
+
+        document.getElementById("title").textContent = "בקשה " + detail.id + " · " + detail.herb_input;
+        var status = document.getElementById("status");
+        status.dataset.status = detail.status;
+        status.textContent = HE.STATUS_TEXT[detail.status] || detail.status;
+
+        var summary = document.getElementById("summary");
+        addRow(summary, "שם הצמח", detail.herb_input);
+        if (detail.identified_plant) addRow(summary, "זוהה כ", HE.ltr(detail.identified_plant));
+        addRow(summary, "זיהוי", HE.IDENTIFICATION_TEXT[detail.identification_state]);
+        addRow(summary, "סוג התכשיר", detail.preparation_unknown ? "לא ידוע" : detail.preparation_input);
+        addRow(summary, "סוג הסרטן", detail.cancer_type_unknown ? "לא ידוע" : detail.cancer_type_input);
+        addRow(summary, "טיפול", detail.treatment_unknown ? "לא ידוע" : detail.treatment_input);
+        addRow(summary, "השאלה שלך", detail.question_input);
+        addRow(summary, "נשלחה", HE.formatDate(detail.created_at));
+
+        renderClarifications(detail);
+
+        if (detail.status === "closed") {
+          document.getElementById("closed").hidden = false;
+          document.getElementById("closed-reason").textContent = detail.closed_reason || "";
+        } else if (detail.has_response) {
+          HE.api.getResponse(requestId).then(renderResponse).catch(function () {
+            HE.showError(errorBox, "לא ניתן היה לטעון את התשובה כרגע.");
+          });
+        } else {
+          // No draft, no partial result, no ETA - just the waiting message.
+          document.getElementById("waiting").hidden = false;
+        }
+      }).catch(function (err) {
+        loading.hidden = true;
+        HE.showError(errorBox, err.status === 404 ? "הבקשה לא נמצאה." : (err.message || "שגיאה בטעינה."));
+      });
+    })();
+  </script>
+</body>
+</html>

@@ -1,7 +1,7 @@
 """Herbal Evidence API.
 
-Phase 1: the service boots, reports its health, and nothing else. Auth, the
-request journey, the research workflow and the job queue arrive in later phases.
+Phase 4: the requester-facing journey is live under /api/v1. The research
+workflow, the staff workspace and the job queue arrive in later phases.
 """
 
 import logging
@@ -10,6 +10,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
+from app.api.v1.router import router as v1_router
 from app.config import get_settings
 
 settings = get_settings()
@@ -48,6 +49,9 @@ class Health(BaseModel):
 class Ready(BaseModel):
     ready: bool
     checks: dict[str, str]
+
+
+app.include_router(v1_router)
 
 
 @app.get("/health", response_model=Health, tags=["ops"])

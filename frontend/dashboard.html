@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>הבקשות שלי — Herbal Evidence</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+Hebrew:wght@400;600;700&family=Noto+Sans:wght@400;600&display=swap">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="env-banner" id="env-banner" hidden>סביבת פיתוח (dev) — הנתונים כאן אינם אמיתיים</div>
+
+  <header class="site-header">
+    <div class="wrap">
+      <div class="brand"><a href="index.html" style="color:inherit;text-decoration:none">Herbal Evidence</a><span>סקירת ראיות על צמחי מרפא ותיאבון</span></div>
+      <nav>
+        <a class="btn btn-primary" href="new-request.html">בקשה חדשה</a>
+        <button class="btn btn-quiet" type="button" id="signout">יציאה</button>
+      </nav>
+    </div>
+  </header>
+
+  <main class="page wrap">
+    <h1>הבקשות שלי</h1>
+    <p class="lede">כל בקשה נבדקת ומאושרת על ידי חוקר לפני שהתשובה מופיעה כאן.</p>
+
+    <p class="form-error" id="error" hidden></p>
+    <div class="loading" id="loading">טוען…</div>
+    <ul class="requests" id="list" hidden></ul>
+    <div class="empty" id="empty" hidden>
+      עדיין לא שלחת בקשות.
+      <div style="margin-top:1rem"><a class="btn btn-primary" href="new-request.html">שליחת בקשה ראשונה</a></div>
+    </div>
+  </main>
+
+  <script src="config.js"></script>
+  <script src="core.js"></script>
+  <script>
+    (function () {
+      "use strict";
+      HE.markDevEnvironment();
+      if (!HE.auth.requireSession()) return;
+
+      document.getElementById("signout").addEventListener("click", HE.auth.signOut);
+
+      var loading = document.getElementById("loading");
+      var list = document.getElementById("list");
+      var empty = document.getElementById("empty");
+      var errorBox = document.getElementById("error");
+
+      HE.api.listRequests().then(function (page) {
+        loading.hidden = true;
+        if (!page.items.length) {
+          empty.hidden = false;
+          return;
+        }
+        page.items.forEach(function (item) {
+          var li = document.createElement("li");
+          var link = document.createElement("a");
+          link.href = "request.html?id=" + encodeURIComponent(item.id);
+
+          var left = document.createElement("div");
+          var title = document.createElement("div");
+          title.innerHTML = '<span class="num">בקשה ' + item.id + "</span> · ";
+          title.append(item.herb_input);
+          var meta = document.createElement("div");
+          meta.className = "meta";
+          meta.textContent = "נשלחה " + HE.formatDate(item.created_at);
+          left.append(title, meta);
+
+          var status = document.createElement("span");
+          status.className = "status";
+          status.dataset.status = item.status;
+          status.textContent = HE.STATUS_TEXT[item.status] || item.status;
+
+          link.append(left, status);
+          li.append(link);
+          list.append(li);
+        });
+        list.hidden = false;
+      }).catch(function (err) {
+        loading.hidden = true;
+        HE.showError(errorBox, err.message || "לא ניתן היה לטעון את הבקשות.");
+      });
+    })();
+  </script>
+</body>
+</html>

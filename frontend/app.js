@@ -1,4 +1,4 @@
-/* Phase 1: the landing page only. Auth and the request form arrive in phase 4. */
+/* Landing page only. Signed-in pages use core.js. */
 (function () {
   "use strict";
 
@@ -9,16 +9,16 @@
     if (banner) banner.hidden = false;
   }
 
-  var line = document.getElementById("build-line");
-  if (line) {
-    line.textContent = "שלב 1 — שלד. הרשמה, שליחת בקשה וקריאת תשובה טרם פעילות.";
+  // Someone already signed in should not be asked to sign in again.
+  try {
+    if (window.localStorage.getItem("he.session")) {
+      document.querySelectorAll('a[href="auth.html"]').forEach(function (link) {
+        link.href = "dashboard.html";
+        if (link.textContent.trim() === "כניסה") link.textContent = "הבקשות שלי";
+        if (link.textContent.trim() === "הרשמה") link.textContent = "בקשה חדשה";
+      });
+    }
+  } catch (err) {
+    /* storage blocked; the links stay as they are */
   }
-
-  // Registration and login are not wired yet; say so instead of failing silently.
-  document.querySelectorAll("[data-nav]").forEach(function (el) {
-    el.addEventListener("click", function (event) {
-      event.preventDefault();
-      window.alert("ההרשמה והכניסה ייפתחו בשלב מאוחר יותר של הפיתוח.");
-    });
-  });
 })();

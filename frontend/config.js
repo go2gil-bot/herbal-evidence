@@ -1,6 +1,9 @@
 /* Public runtime configuration.
    Overwritten at container start from environment variables (see entrypoint.sh).
-   Only PUBLIC values belong here - never a secret key. */
+   Only PUBLIC values belong here - never a secret key.
+
+   For local development, copy frontend/.env.example to a local config and fill
+   in the dev project's URL and publishable key; both are public by design. */
 window.APP_CONFIG = {
   APP_ENV: "dev",
   API_BASE_URL: "http://localhost:8000",

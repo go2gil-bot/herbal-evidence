@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>כניסה והרשמה — Herbal Evidence</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+Hebrew:wght@400;600;700&family=Noto+Sans:wght@400;600&display=swap">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="env-banner" id="env-banner" hidden>סביבת פיתוח (dev) — הנתונים כאן אינם אמיתיים</div>
+
+  <header class="site-header">
+    <div class="wrap">
+      <div class="brand"><a href="index.html" style="color:inherit;text-decoration:none">Herbal Evidence</a><span>סקירת ראיות על צמחי מרפא ותיאבון</span></div>
+    </div>
+  </header>
+
+  <main class="page wrap">
+    <h1>כניסה לחשבון</h1>
+    <p class="lede">חשבון נדרש כדי לשלוח בקשה ולקרוא תשובה. התשובה שלך זמינה רק לך ולצוות המורשה.</p>
+
+    <div class="panel">
+      <div class="tabs" role="tablist">
+        <button role="tab" id="tab-login" aria-selected="true" aria-controls="panel-login">כניסה</button>
+        <button role="tab" id="tab-register" aria-selected="false" aria-controls="panel-register">הרשמה</button>
+        <button role="tab" id="tab-reset" aria-selected="false" aria-controls="panel-reset">שכחתי סיסמה</button>
+      </div>
+
+      <p class="form-error" id="error" hidden></p>
+      <p class="form-note" id="note" hidden></p>
+
+      <form id="panel-login" role="tabpanel" aria-labelledby="tab-login">
+        <div class="field">
+          <label for="login-email">אימייל</label>
+          <input type="email" id="login-email" autocomplete="email" required>
+        </div>
+        <div class="field">
+          <label for="login-password">סיסמה</label>
+          <input type="password" id="login-password" autocomplete="current-password" required>
+        </div>
+        <button class="btn btn-primary" type="submit">כניסה</button>
+      </form>
+
+      <form id="panel-register" role="tabpanel" aria-labelledby="tab-register" hidden>
+        <div class="field">
+          <label for="reg-email">אימייל</label>
+          <span class="hint">נשלח אליו מייל אימות. בלי אישור המייל אי אפשר להיכנס.</span>
+          <input type="email" id="reg-email" autocomplete="email" required>
+        </div>
+        <div class="field">
+          <label for="reg-password">סיסמה</label>
+          <span class="hint">לפחות 8 תווים.</span>
+          <input type="password" id="reg-password" autocomplete="new-password" minlength="8" required>
+        </div>
+        <p class="form-note">
+          אנחנו אוספים אימייל, שם הצמח, ובאופן אופציונלי סוג התכשיר, סוג הסרטן והטיפול.
+          <strong>איננו אוספים</strong> פרופיל רפואי מלא, תעודת זהות או רשומות רפואיות.
+        </p>
+        <button class="btn btn-primary" type="submit">יצירת חשבון</button>
+      </form>
+
+      <form id="panel-reset" role="tabpanel" aria-labelledby="tab-reset" hidden>
+        <div class="field">
+          <label for="reset-email">אימייל</label>
+          <span class="hint">נשלח קישור לאיפוס סיסמה.</span>
+          <input type="email" id="reset-email" autocomplete="email" required>
+        </div>
+        <button class="btn btn-primary" type="submit">שליחת קישור איפוס</button>
+      </form>
+    </div>
+  </main>
+
+  <script src="config.js"></script>
+  <script src="core.js"></script>
+  <script>
+    (function () {
+      "use strict";
+      HE.markDevEnvironment();
+
+      var errorBox = document.getElementById("error");
+      var noteBox = document.getElementById("note");
+      var params = new URLSearchParams(location.search);
+
+      function note(message) {
+        noteBox.textContent = message;
+        noteBox.hidden = false;
+      }
+
+      if (params.get("verified")) note("האימייל אומת. אפשר להיכנס.");
+      if (params.get("reset")) note("אפשר לקבוע סיסמה חדשה דרך הקישור שנשלח אליך במייל.");
+
+      var tabs = ["login", "register", "reset"];
+      tabs.forEach(function (name) {
+        document.getElementById("tab-" + name).addEventListener("click", function () {
+          HE.clearError(errorBox);
+          tabs.forEach(function (other) {
+            var selected = other === name;
+            document.getElementById("tab-" + other).setAttribute("aria-selected", String(selected));
+            document.getElementById("panel-" + other).hidden = !selected;
+          });
+        });
+      });
+
+      function next() {
+        var target = params.get("next");
+        // Only same-origin relative paths; never a URL from the query string.
+        return target && /^\/[A-Za-z0-9._-]*$/.test(target) ? target : "dashboard.html";
+      }
+
+      document.getElementById("panel-login").addEventListener("submit", function (event) {
+        event.preventDefault();
+        HE.clearError(errorBox);
+        HE.auth.signIn(
+          document.getElementById("login-email").value.trim(),
+          document.getElementById("login-password").value
+        ).then(function () {
+          location.href = next();
+        }).catch(function (err) {
+          HE.showError(errorBox, err.code === "email_not_confirmed"
+            ? "צריך לאשר קודם את מייל האימות."
+            : "אימייל או סיסמה שגויים.");
+        });
+      });
+
+      document.getElementById("panel-register").addEventListener("submit", function (event) {
+        event.preventDefault();
+        HE.clearError(errorBox);
+        HE.auth.signUp(
+          document.getElementById("reg-email").value.trim(),
+          document.getElementById("reg-password").value
+        ).then(function () {
+          note("נשלח אליך מייל אימות. אחרי האישור אפשר להיכנס.");
+        }).catch(function (err) {
+          HE.showError(errorBox, err.message || "ההרשמה נכשלה.");
+        });
+      });
+
+      document.getElementById("panel-reset").addEventListener("submit", function (event) {
+        event.preventDefault();
+        HE.clearError(errorBox);
+        HE.auth.resetPassword(document.getElementById("reset-email").value.trim())
+          .then(function () {
+            // Deliberately the same message whether or not the address exists.
+            note("אם קיים חשבון עם הכתובת הזו, נשלח אליו קישור לאיפוס.");
+          })
+          .catch(function () {
+            note("אם קיים חשבון עם הכתובת הזו, נשלח אליו קישור לאיפוס.");
+          });
+      });
+    })();
+  </script>
+</body>
+</html>

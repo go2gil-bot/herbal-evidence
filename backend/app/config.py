@@ -5,14 +5,21 @@ is safe to print.
 """
 
 from functools import lru_cache
+from pathlib import Path
 from typing import Literal
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+# Resolved from this file rather than the working directory, so the service finds
+# its own .env whether it is started from backend/, from the repo root, or by a
+# process manager with a different cwd. In the container there is no .env at all
+# and every value comes from the environment.
+ENV_FILE = Path(__file__).resolve().parents[1] / ".env"
+
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+    model_config = SettingsConfigDict(env_file=ENV_FILE, extra="ignore")
 
     app_env: Literal["dev", "production"] = "dev"
     port: int = 8000
