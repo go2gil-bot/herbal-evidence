@@ -54,17 +54,26 @@ environment variables by `entrypoint.sh` — public values only.
 
 ## Status
 
-**Phase 1 — skeleton. Done and verified locally:**
+All eight phases are built and deployed. Two environments are live and verified.
 
-| Item | State |
-|------|-------|
-| `dev` branch created from `main` | ✅ |
-| Backend: FastAPI, `/health`, `/ready`, CORS from env, Dockerfile | ✅ 2 tests pass |
-| Frontend: Hebrew RTL landing page, Caddy Dockerfile, runtime config | ✅ renders, desktop + mobile |
-| Supabase schema, Auth, RLS | ⬜ phase 3 |
-| Railway services | ⬜ phase 7 |
+| | |
+|---|---|
+| Acceptance criteria | 12/12 - see `docs/acceptance.md` |
+| Offline tests | 75 |
+| Live suites | 24 + 12 + 22 + 14 checks against the dev project |
+| Environments | `dev` and `production`, four service instances, branch wiring verified |
 
-Neither Dockerfile has been built — Docker is not installed here (D-016).
+**Read `docs/limitations.md` before claiming anything about this platform.** In
+particular: no automated test establishes scientific quality, full article text
+is not read yet, and production is deployed but has never been used.
 
-Phase plan and progress: Obsidian vault, `Herbal Evidence/תוכנית שלבים`.
-Engineering choices: `docs/decisions.md`.
+| Document | What is in it |
+|---|---|
+| `docs/architecture.md` | Where each product guarantee is actually enforced |
+| `docs/data-model.md` | Tables, constraints that carry product rules, RLS |
+| `docs/deployment.md` | Branches, environments, variables, migrations, rollback |
+| `docs/researcher-guide.md` | For the person who is the last check before a patient reads |
+| `docs/privacy-and-retention.md` | What is collected and what leaves the system. Not an approved policy |
+| `docs/acceptance.md` | The twelve criteria and where each is verified |
+| `docs/limitations.md` | Done, blocked, untested, and open decisions |
+| `docs/decisions.md` | D-001 to D-050, including which ones supersede which |
