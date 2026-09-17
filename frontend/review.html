@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>עורך הסקירה — Herbal Evidence</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+Hebrew:wght@400;600;700&family=Noto+Sans:wght@400;600&display=swap">
+  <link rel="stylesheet" href="styles.css?v=2">
+  <style>
+    .editor { display: grid; grid-template-columns: 1fr 22rem; gap: 1.5rem; align-items: start; }
+    @media (max-width: 62rem) { .editor { grid-template-columns: 1fr; } }
+    .draft-tag {
+      display: inline-block; background: var(--amber-50); color: var(--amber-700);
+      border: 1px solid #e8d7b2; border-radius: var(--radius);
+      font-size: .8rem; font-weight: 700; padding: .1rem .55rem;
+    }
+    .source-card { border: 1px solid var(--line); border-radius: var(--radius); padding: .7rem; margin-bottom: .6rem; background: var(--surface); }
+    .source-card p { margin: .2rem 0; font-size: .88rem; }
+    .approve-box { border: 2px solid var(--green-600); border-radius: var(--radius); padding: var(--space-3); margin-top: 2rem; background: var(--surface); }
+    .approve-box .checkline { font-size: .95rem; margin-block: .5rem; }
+  </style>
+</head>
+<body>
+  <div class="env-banner" id="env-banner" hidden>סביבת פיתוח (dev) — הנתונים כאן אינם אמיתיים</div>
+
+  <header class="site-header">
+    <div class="wrap">
+      <div class="brand"><a href="staff.html" style="color:inherit;text-decoration:none">Herbal Evidence</a><span>עורך הסקירה</span></div>
+      <nav><a class="btn btn-quiet" id="back" href="staff.html">חזרה לבקשה</a></nav>
+    </div>
+  </header>
+
+  <main class="page wrap">
+    <p class="form-error" id="error" hidden></p>
+    <p class="form-note" id="note" hidden></p>
+    <div class="loading" id="loading">טוען…</div>
+
+    <div id="content" hidden>
+      <h1 id="title"></h1>
+      <p><span class="draft-tag">טיוטה — לא מוצגת למשתמש</span> <span class="hint" id="hash"></span></p>
+
+      <div class="editor">
+        <section class="panel wide">
+          <h2 style="font-size:1.05rem;margin:0 0 1rem">הטיוטה</h2>
+
+          <div class="field">
+            <label for="f-question">השאלה שנבדקה</label>
+            <textarea id="f-question" data-key="question"></textarea>
+          </div>
+          <div class="field">
+            <label for="f-conclusion">מסקנה קצרה</label>
+            <span class="hint">אם אין מספיק ראיות מבני אדם — זו המסקנה, ולא "לא נמצאו מחקרים".</span>
+            <textarea id="f-conclusion" data-key="conclusion"></textarea>
+          </div>
+          <div class="field">
+            <label for="f-certainty">רמת ודאות — מילה</label>
+            <span class="hint">מילה בעברית. בלי ציון מספרי ובלי לקרוא לזה GRADE.</span>
+            <input type="text" id="f-certainty" data-key="certainty">
+          </div>
+          <div class="field">
+            <label for="f-certainty-explanation">הסבר לרמת הוודאות</label>
+            <span class="hint">כמות ואיכות המחקרים, עקביות, ישירוּת ומגבלות.</span>
+            <textarea id="f-certainty-explanation" data-key="certainty_explanation"></textarea>
+          </div>
+          <div class="field">
+            <label for="f-safety">מידע בטיחות</label>
+            <span class="hint">היעדר דיווח אינו "בטוח". אם אין מידע — אמור זאת במפורש.</span>
+            <textarea id="f-safety" data-key="safety"></textarea>
+          </div>
+          <div class="field">
+            <label for="f-limitations">מגבלות וממצאים סותרים</label>
+            <textarea id="f-limitations" data-key="limitations"></textarea>
+          </div>
+          <div class="field">
+            <label for="f-preclinical">מחקרי מעבדה ובעלי חיים</label>
+            <span class="hint">מוצג למשתמש בסעיף משני ומסומן. לא כהוכחה לתועלת בבני אדם.</span>
+            <textarea id="f-preclinical" data-key="preclinical"></textarea>
+          </div>
+
+          <div style="display:flex;gap:.8rem;align-items:center;margin-top:1.5rem">
+            <button class="btn btn-primary" type="button" id="save">שמירה</button>
+            <span class="hint" id="save-state"></span>
+          </div>
+        </section>
+
+        <aside>
+          <section class="panel" style="max-width:none">
+            <h2 style="font-size:1.05rem;margin:0 0 .8rem">מקורות וקטעים תומכים</h2>
+            <div class="field" style="margin-top:0">
+              <input type="text" id="source-search" placeholder="חיפוש מקור" autocomplete="off">
+            </div>
+            <div id="sources"></div>
+          </section>
+        </aside>
+      </div>
+
+      <section class="approve-box">
+        <h2 style="font-size:1.1rem;margin:0 0 .5rem">אישור ופרסום</h2>
+        <p class="hint" style="margin-top:0">
+          מילוי השדות אינו מאשר דבר. ארבע הבדיקות נדרשות במפורש, והאישור נצמד לגרסה
+          המדויקת שנקראה — אם הטיוטה השתנתה בינתיים, האישור ייכשל.
+        </p>
+
+        <label class="checkline"><input type="checkbox" id="c-sources"> בדקתי את המקורות וקיומם</label>
+        <label class="checkline"><input type="checkbox" id="c-alignment"> בדקתי את ההתאמה בין כל טענה לראיה שמאחוריה</label>
+        <label class="checkline"><input type="checkbox" id="c-limitations"> בדקתי שהמגבלות מוצגות</label>
+        <label class="checkline"><input type="checkbox" id="c-wording"> בדקתי את הניסוח שיוצג למשתמש</label>
+
+        <button class="btn btn-primary" type="button" id="approve" disabled style="margin-top:1rem">
+          אישור ופרסום
+        </button>
+        <p class="hint" id="approve-hint">יש לסמן את כל ארבע הבדיקות.</p>
+      </section>
+    </div>
+  </main>
+
+  <script src="config.js"></script>
+  <script src="core.js?v=2"></script>
+  <script>
+    (function () {
+      "use strict";
+      HE.markDevEnvironment();
+      if (!HE.auth.requireSession()) return;
+
+      var params = new URLSearchParams(location.search);
+      var versionId = params.get("version");
+      var errorBox = document.getElementById("error");
+      var noteBox = document.getElementById("note");
+      var currentHash = null;
+      var currentBody = {};
+
+      if (!versionId || !/^\d+$/.test(versionId)) {
+        document.getElementById("loading").hidden = true;
+        HE.showError(errorBox, "מזהה גרסה לא תקין.");
+        return;
+      }
+
+      function fail(err) {
+        if (err && err.code === "draft_changed") {
+          HE.showError(errorBox, "הטיוטה השתנתה מאז שנטענה. רענן/י את הדף וקרא/י את הגרסה החדשה לפני אישור.");
+        } else if (err && err.status === 403) {
+          HE.showError(errorBox, "הבקשה הזו אינה בהיקף ההרשאה שלך.");
+        } else {
+          HE.showError(errorBox, (err && err.message) || "שגיאה.");
+        }
+      }
+
+      function note(message) { noteBox.textContent = message; noteBox.hidden = false; }
+
+      var fields = Array.prototype.slice.call(document.querySelectorAll("[data-key]"));
+
+      function collect() {
+        var body = Object.assign({}, currentBody);
+        fields.forEach(function (field) { body[field.dataset.key] = field.value; });
+        return body;
+      }
+
+      function setHash(hash) {
+        currentHash = hash;
+        document.getElementById("hash").textContent = "חתימת תוכן: " + String(hash).slice(0, 12) + "…";
+      }
+
+      HE.api.staff.getDraft(versionId).then(function (draft) {
+        document.getElementById("loading").hidden = true;
+        document.getElementById("content").hidden = false;
+
+        currentBody = draft.body || {};
+        document.getElementById("title").textContent =
+          "בקשה " + draft.request_id + " · גרסה " + draft.version;
+        document.getElementById("back").href = "staff-request.html?id=" + draft.request_id;
+        setHash(draft.content_hash);
+
+        fields.forEach(function (field) {
+          field.value = currentBody[field.dataset.key] || "";
+        });
+
+        if (draft.state !== "draft") {
+          HE.showError(errorBox, "הגרסה הזו אינה טיוטה ולא ניתן לערוך אותה.");
+          document.getElementById("save").disabled = true;
+        }
+        loadSources("");
+      }).catch(function (err) {
+        document.getElementById("loading").hidden = true;
+        fail(err);
+      });
+
+      document.getElementById("save").addEventListener("click", function () {
+        HE.clearError(errorBox);
+        var state = document.getElementById("save-state");
+        state.textContent = "שומר…";
+        HE.api.staff.saveDraft(versionId, collect(), []).then(function (saved) {
+          setHash(saved.content_hash);
+          state.textContent = "נשמר";
+          setTimeout(function () { state.textContent = ""; }, 2500);
+        }).catch(function (err) { state.textContent = ""; fail(err); });
+      });
+
+      /* --- sources -------------------------------------------------------- */
+
+      function loadSources(search) {
+        var container = document.getElementById("sources");
+        HE.api.staff.sources(search).then(function (data) {
+          container.textContent = "";
+          if (!data.items.length) {
+            container.innerHTML = '<p class="hint">אין מקורות תואמים.</p>';
+            return;
+          }
+          data.items.forEach(function (source) {
+            var card = document.createElement("div");
+            card.className = "source-card";
+
+            var title = document.createElement("p");
+            title.style.fontWeight = "600";
+            title.append(HE.ltr(source.title));
+            card.append(title);
+
+            var meta = document.createElement("p");
+            meta.className = "hint";
+            meta.append(HE.ltr((source.journal || "") + " " + (source.publication_year || "")));
+            card.append(meta);
+
+            var identifier = document.createElement("p");
+            identifier.append(HE.ltr(source.id_kind.toUpperCase() + ": " + source.external_id));
+            card.append(identifier);
+
+            var tags = document.createElement("p");
+            [
+              source.access_level === "abstract_only" ? "תקציר בלבד" :
+                (source.access_level === "full_text" ? "טקסט מלא" : "לא נקרא"),
+              { human: "בני אדם", animal: "בעלי חיים", in_vitro: "מעבדה",
+                review: "סקירה", other: "אחר" }[source.evidence_type],
+              source.is_oncology === false ? "ראיה עקיפה" : null
+            ].filter(Boolean).forEach(function (text) {
+              var tag = document.createElement("span");
+              tag.className = "status";
+              tag.style.marginInlineEnd = ".3rem";
+              tag.textContent = text;
+              tags.append(tag);
+            });
+            card.append(tags);
+            container.append(card);
+          });
+        }).catch(function () {
+          container.innerHTML = '<p class="hint">לא ניתן היה לטעון מקורות.</p>';
+        });
+      }
+
+      var searchTimer = null;
+      document.getElementById("source-search").addEventListener("input", function (event) {
+        clearTimeout(searchTimer);
+        var value = event.target.value.trim();
+        searchTimer = setTimeout(function () { loadSources(value); }, 300);
+      });
+
+      /* --- approval ------------------------------------------------------- */
+
+      var checks = ["c-sources", "c-alignment", "c-limitations", "c-wording"];
+      function refreshApproveButton() {
+        var all = checks.every(function (id) { return document.getElementById(id).checked; });
+        document.getElementById("approve").disabled = !all;
+        document.getElementById("approve-hint").textContent =
+          all ? "האישור ייצמד לחתימת התוכן הנוכחית." : "יש לסמן את כל ארבע הבדיקות.";
+      }
+      checks.forEach(function (id) {
+        document.getElementById(id).addEventListener("change", refreshApproveButton);
+      });
+
+      document.getElementById("approve").addEventListener("click", function () {
+        HE.clearError(errorBox);
+        var button = document.getElementById("approve");
+        button.disabled = true;
+        HE.api.staff.approve(versionId, currentHash, {
+          sources: document.getElementById("c-sources").checked,
+          alignment: document.getElementById("c-alignment").checked,
+          limitations: document.getElementById("c-limitations").checked,
+          wording: document.getElementById("c-wording").checked
+        }).then(function () {
+          note("הגרסה אושרה ופורסמה. היא זמינה עכשיו לבעל הבקשה.");
+          setTimeout(function () { location.reload(); }, 1200);
+        }).catch(function (err) {
+          refreshApproveButton();
+          fail(err);
+        });
+      });
+    })();
+  </script>
+</body>
+</html>

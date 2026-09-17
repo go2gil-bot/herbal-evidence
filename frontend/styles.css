@@ -1,0 +1,294 @@
+/* Herbal Evidence - calm research design system.
+   Tokens follow the Stitch design system asset 602809031577218080. */
+
+:root {
+  --green-700: #2f5144;
+  --green-600: #3f6b5a;
+  --green-50:  #eef3f0;
+  --ink-900:   #1c1f1d;
+  --ink-700:   #3c433f;
+  --ink-500:   #6b736e;
+  --paper:     #f7f7f4;
+  --surface:   #ffffff;
+  --line:      #dfe1dc;
+  --amber-700: #8a5a12;
+  --amber-50:  #fbf3e3;
+
+  --radius: 8px;
+  --measure: 34rem;          /* readable line length */
+  --space-1: .5rem;
+  --space-2: 1rem;
+  --space-3: 1.5rem;
+  --space-4: 2.5rem;
+  --space-5: 4rem;
+}
+
+* { box-sizing: border-box; }
+
+html { font-size: 17px; }
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink-900);
+  font-family: "Noto Sans Hebrew", "Segoe UI", system-ui, sans-serif;
+  line-height: 1.7;
+}
+
+/* Latin fragments inside Hebrew text: scientific names, DOI, PMID, URLs.
+   `dir=auto` alone is not enough - isolation keeps punctuation in place. */
+.ltr {
+  unicode-bidi: isolate;
+  direction: ltr;
+  font-family: "Noto Sans", "Segoe UI", system-ui, sans-serif;
+}
+
+.wrap {
+  max-width: 62rem;
+  margin: 0 auto;
+  padding: 0 var(--space-3);
+}
+
+/* --- dev banner ------------------------------------------------------- */
+.env-banner {
+  background: var(--amber-50);
+  color: var(--amber-700);
+  border-bottom: 1px solid #e8d7b2;
+  font-size: .85rem;
+  padding: var(--space-1) var(--space-3);
+  text-align: center;
+}
+.env-banner[hidden] { display: none; }
+
+/* --- header ----------------------------------------------------------- */
+.site-header {
+  background: var(--surface);
+  border-bottom: 1px solid var(--line);
+}
+.site-header .wrap {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding-block: var(--space-2);
+  flex-wrap: wrap;
+}
+.brand { font-weight: 700; font-size: 1.1rem; color: var(--green-700); }
+.brand span { display: block; font-weight: 400; font-size: .8rem; color: var(--ink-500); }
+
+/* --- buttons ---------------------------------------------------------- */
+.btn {
+  display: inline-block;
+  border-radius: var(--radius);
+  padding: .55rem 1.1rem;
+  font: inherit;
+  font-weight: 600;
+  text-decoration: none;
+  border: 1px solid transparent;
+  cursor: pointer;
+}
+.btn-primary { background: var(--green-600); color: #fff; }
+.btn-primary:hover { background: var(--green-700); }
+.btn-quiet { background: transparent; color: var(--green-700); border-color: var(--line); }
+.btn-quiet:hover { background: var(--green-50); }
+.btn:focus-visible,
+a:focus-visible { outline: 3px solid var(--green-600); outline-offset: 2px; }
+
+/* --- sections --------------------------------------------------------- */
+.hero { padding-block: var(--space-5) var(--space-4); }
+.hero h1 { font-size: 2rem; line-height: 1.3; margin: 0 0 var(--space-2); max-width: var(--measure); }
+.hero p { max-width: var(--measure); color: var(--ink-700); margin: 0 0 var(--space-2); }
+.hero .actions { margin-top: var(--space-3); display: flex; gap: var(--space-2); flex-wrap: wrap; }
+
+section { padding-block: var(--space-4); border-top: 1px solid var(--line); }
+section h2 { font-size: 1.3rem; margin: 0 0 var(--space-2); }
+section > .wrap > p { max-width: var(--measure); color: var(--ink-700); }
+
+.cards { display: grid; gap: var(--space-2); grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr)); margin-top: var(--space-3); }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: var(--space-3); }
+.card h3 { margin: 0 0 var(--space-1); font-size: 1rem; }
+.card p { margin: 0; color: var(--ink-700); font-size: .95rem; }
+
+.steps { counter-reset: step; list-style: none; padding: 0; margin: var(--space-3) 0 0; display: grid; gap: var(--space-2); max-width: var(--measure); }
+.steps li { counter-increment: step; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: var(--space-2) var(--space-3); }
+.steps li::before {
+  content: counter(step);
+  display: inline-grid;
+  place-items: center;
+  inline-size: 1.6rem; block-size: 1.6rem;
+  margin-inline-end: .6rem;
+  border-radius: 50%;
+  background: var(--green-50);
+  color: var(--green-700);
+  font-weight: 700; font-size: .85rem;
+}
+
+/* Scope and limits: never carried by colour alone - each item is also labelled. */
+.scope { display: grid; gap: var(--space-3); grid-template-columns: repeat(auto-fit, minmax(17rem, 1fr)); margin-top: var(--space-3); }
+.scope ul { margin: var(--space-1) 0 0; padding-inline-start: 1.2rem; color: var(--ink-700); }
+.scope li { margin-block: .35rem; }
+.scope h3 { font-size: 1rem; margin: 0; }
+
+/* --- example ---------------------------------------------------------- */
+.example {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: var(--space-3);
+  margin-top: var(--space-3);
+  max-width: 46rem;
+}
+.example-tag {
+  display: inline-block;
+  background: var(--amber-50);
+  color: var(--amber-700);
+  border: 1px solid #e8d7b2;
+  border-radius: var(--radius);
+  font-size: .8rem;
+  font-weight: 700;
+  padding: .15rem .6rem;
+  margin-bottom: var(--space-2);
+}
+.example dt { font-weight: 700; margin-top: var(--space-2); }
+.example dd { margin: .25rem 0 0; color: var(--ink-700); }
+.example dl { margin: 0; }
+
+.site-footer { border-top: 1px solid var(--line); padding-block: var(--space-3); color: var(--ink-500); font-size: .9rem; }
+.site-footer p { max-width: var(--measure); margin: 0 0 var(--space-1); }
+
+@media (max-width: 40rem) {
+  html { font-size: 16px; }
+  .hero { padding-block: var(--space-4) var(--space-3); }
+  .hero h1 { font-size: 1.6rem; }
+}
+
+/* ===================================================== app pages ======== */
+
+.page { padding-block: var(--space-4); }
+.page h1 { font-size: 1.6rem; margin: 0 0 var(--space-1); }
+.page .lede { color: var(--ink-700); max-width: var(--measure); margin: 0 0 var(--space-3); }
+
+.panel {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: var(--space-3);
+  max-width: 34rem;
+}
+.panel.wide { max-width: 52rem; }
+
+/* --- forms ------------------------------------------------------------- */
+.field { margin-block: var(--space-2); }
+.field > label { display: block; font-weight: 600; margin-bottom: .3rem; }
+.field .hint { display: block; color: var(--ink-500); font-size: .85rem; margin-bottom: .4rem; }
+.field .optional { font-weight: 400; color: var(--ink-500); font-size: .85rem; }
+
+input[type="text"], input[type="email"], input[type="password"], select, textarea {
+  inline-size: 100%;
+  font: inherit;
+  padding: .55rem .7rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: inherit;
+}
+input:focus-visible, select:focus-visible, textarea:focus-visible {
+  outline: 3px solid var(--green-600);
+  outline-offset: 1px;
+  border-color: var(--green-600);
+}
+textarea { min-block-size: 5rem; resize: vertical; }
+
+.checkline { display: flex; align-items: center; gap: .45rem; margin-top: .4rem; font-size: .9rem; color: var(--ink-700); }
+.checkline input { inline-size: auto; }
+
+.counter { font-size: .8rem; color: var(--ink-500); text-align: start; }
+
+.form-error {
+  background: #fdf2f2;
+  border: 1px solid #e3b7b7;
+  color: #8a2222;
+  border-radius: var(--radius);
+  padding: var(--space-2);
+  margin-block: var(--space-2);
+}
+.form-note {
+  background: var(--green-50);
+  border: 1px solid #cfe0d7;
+  border-radius: var(--radius);
+  padding: var(--space-2);
+  margin-block: var(--space-2);
+  color: var(--ink-700);
+  font-size: .92rem;
+}
+
+/* --- plant candidates -------------------------------------------------- */
+.candidates { list-style: none; padding: 0; margin: var(--space-2) 0 0; display: grid; gap: .5rem; }
+.candidates li {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: .6rem .8rem;
+  background: var(--surface);
+}
+.candidates li.selected { border-color: var(--green-600); box-shadow: inset 0 0 0 1px var(--green-600); }
+.candidates label { display: flex; gap: .6rem; align-items: baseline; cursor: pointer; }
+.candidates .sci { color: var(--ink-500); font-style: italic; }
+.candidates .aka { display: block; color: var(--ink-500); font-size: .85rem; }
+
+/* --- status ------------------------------------------------------------ */
+/* Always a word. Colour is a secondary cue, never the message. */
+.status {
+  display: inline-block;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: .1rem .55rem;
+  font-size: .85rem;
+  font-weight: 600;
+  background: var(--paper);
+  color: var(--ink-700);
+}
+.status[data-status="response_available"] { background: var(--green-50); border-color: #cfe0d7; color: var(--green-700); }
+.status[data-status="clarification_needed"] { background: var(--amber-50); border-color: #e8d7b2; color: var(--amber-700); }
+
+/* --- request list ------------------------------------------------------ */
+.requests { list-style: none; padding: 0; margin: var(--space-3) 0 0; display: grid; gap: .6rem; }
+.requests a {
+  display: flex; justify-content: space-between; gap: var(--space-2); flex-wrap: wrap; align-items: center;
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius);
+  padding: var(--space-2) var(--space-3); text-decoration: none; color: inherit;
+}
+.requests a:hover { border-color: var(--green-600); }
+.requests .meta { color: var(--ink-500); font-size: .85rem; }
+.requests .num { font-weight: 700; }
+
+.empty, .loading {
+  border: 1px dashed var(--line); border-radius: var(--radius);
+  padding: var(--space-4); text-align: center; color: var(--ink-500);
+  margin-top: var(--space-3);
+}
+
+/* --- request detail ---------------------------------------------------- */
+.summary-grid { display: grid; grid-template-columns: max-content 1fr; gap: .4rem 1rem; margin: 0; }
+.summary-grid dt { color: var(--ink-500); }
+.summary-grid dd { margin: 0; }
+
+.waiting {
+  background: var(--paper); border: 1px solid var(--line); border-radius: var(--radius);
+  padding: var(--space-3); margin-block: var(--space-3); max-width: var(--measure);
+}
+
+.answer-section { border-top: 1px solid var(--line); margin-top: var(--space-3); padding-top: var(--space-3); }
+.answered { color: var(--ink-700); }
+
+.response-card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: var(--space-3); margin-block: var(--space-2); }
+.response-card h3 { margin: 0 0 var(--space-1); font-size: 1.05rem; }
+.response-card.lead p { font-size: 1.15rem; line-height: 1.6; margin: 0; }
+.response-card.secondary { background: var(--paper); }
+.response-card .caveat { color: var(--amber-700); font-weight: 600; }
+
+.tabs { display: flex; gap: .3rem; border-bottom: 1px solid var(--line); margin-bottom: var(--space-3); }
+.tabs button {
+  font: inherit; font-weight: 600; background: none; border: none; cursor: pointer;
+  padding: .5rem .9rem; color: var(--ink-500); border-bottom: 2px solid transparent;
+}
+.tabs button[aria-selected="true"] { color: var(--green-700); border-bottom-color: var(--green-600); }

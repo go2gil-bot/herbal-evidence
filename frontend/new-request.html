@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>בקשה חדשה — Herbal Evidence</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+Hebrew:wght@400;600;700&family=Noto+Sans:wght@400;600&display=swap">
+  <link rel="stylesheet" href="styles.css?v=2">
+</head>
+<body>
+  <div class="env-banner" id="env-banner" hidden>סביבת פיתוח (dev) — הנתונים כאן אינם אמיתיים</div>
+
+  <header class="site-header">
+    <div class="wrap">
+      <div class="brand"><a href="index.html" style="color:inherit;text-decoration:none">Herbal Evidence</a><span>סקירת ראיות על צמחי מרפא ותיאבון</span></div>
+      <nav><a class="btn btn-quiet" href="dashboard.html">הבקשות שלי</a></nav>
+    </div>
+  </header>
+
+  <main class="page wrap">
+    <h1>בקשה חדשה</h1>
+    <p class="lede">בחר/י צמח אחד. אנחנו נבדוק מה הספרות המחקרית אומרת עליו בהקשר של תיאבון.</p>
+
+    <form class="panel" id="form" novalidate>
+      <p class="form-error" id="error" hidden></p>
+
+      <div class="field">
+        <label for="herb">שם הצמח</label>
+        <span class="hint">שם נפוץ, שם מדעי או כינוי — בעברית או באנגלית.</span>
+        <input type="text" id="herb" autocomplete="off" required aria-describedby="identify-status">
+        <p id="identify-status" class="hint" role="status" aria-live="polite"></p>
+        <ul class="candidates" id="candidates" hidden></ul>
+      </div>
+
+      <p class="form-note">
+        הפרטים הבאים ממקדים את חיפוש הספרות. <strong>הם אינם קובעים התאמה אישית לטיפול.</strong>
+      </p>
+
+      <div class="field">
+        <label for="preparation">סוג התכשיר <span class="optional">(אופציונלי)</span></label>
+        <input type="text" id="preparation" autocomplete="off" placeholder="לדוגמה: תה, כמוסות, תמצית">
+        <label class="checkline"><input type="checkbox" id="preparation-unknown"> אני לא יודע/ת</label>
+      </div>
+
+      <div class="field">
+        <label for="cancer">סוג הסרטן <span class="optional">(אופציונלי)</span></label>
+        <input type="text" id="cancer" autocomplete="off">
+        <label class="checkline"><input type="checkbox" id="cancer-unknown"> אני לא יודע/ת</label>
+      </div>
+
+      <div class="field">
+        <label for="treatment">טיפול <span class="optional">(אופציונלי)</span></label>
+        <input type="text" id="treatment" autocomplete="off">
+        <label class="checkline"><input type="checkbox" id="treatment-unknown"> אני לא יודע/ת</label>
+      </div>
+
+      <div class="field">
+        <label for="question">שאלה קצרה <span class="optional">(אופציונלי)</span></label>
+        <textarea id="question" maxlength="1000"></textarea>
+        <div class="counter"><span id="counter">0</span> / 1000</div>
+      </div>
+
+      <div class="form-note">
+        מה המערכת <strong>לא</strong> עושה: לא ממליצה איזה צמח לקחת · לא קובעת מינון אישי ·
+        לא מאשרת שילוב עם טיפול.
+      </div>
+
+      <div style="display:flex;gap:1rem;align-items:center;flex-wrap:wrap;margin-top:1.5rem">
+        <button class="btn btn-primary" type="submit" id="submit">שליחת הבקשה</button>
+        <a class="btn btn-quiet" href="dashboard.html">ביטול</a>
+      </div>
+      <p class="hint" style="margin-top:.8rem">אין זמן טיפול מובטח.</p>
+    </form>
+  </main>
+
+  <script src="config.js"></script>
+  <script src="core.js?v=2"></script>
+  <script>
+    (function () {
+      "use strict";
+      HE.markDevEnvironment();
+      if (!HE.auth.requireSession()) return;
+
+      var herb = document.getElementById("herb");
+      var statusLine = document.getElementById("identify-status");
+      var candidateList = document.getElementById("candidates");
+      var errorBox = document.getElementById("error");
+      var chosenPlantId = null;
+      var timer = null;
+
+      document.getElementById("question").addEventListener("input", function (event) {
+        document.getElementById("counter").textContent = String(event.target.value.length);
+      });
+
+      /* Unknown checkboxes and free text are mutually exclusive. */
+      ["preparation", "cancer", "treatment"].forEach(function (name) {
+        var box = document.getElementById(name + "-unknown");
+        var input = document.getElementById(name);
+        box.addEventListener("change", function () {
+          input.disabled = box.checked;
+          if (box.checked) input.value = "";
+        });
+      });
+
+      function renderCandidates(result) {
+        candidateList.textContent = "";
+        chosenPlantId = null;
+
+        if (result.outcome === "not_found") {
+          statusLine.textContent = "הצמח לא נמצא במאגר. אפשר לשלוח בכל זאת — הבקשה תועבר לבדיקה אנושית.";
+          candidateList.hidden = true;
+          return;
+        }
+
+        if (result.outcome === "resolved") {
+          var only = result.candidates[0];
+          statusLine.textContent = "זוהה: ";
+          statusLine.append(HE.ltr(only.scientific_name));
+          candidateList.hidden = true;
+          chosenPlantId = only.plant_id;
+          return;
+        }
+
+        // Ambiguous: the user chooses. Nothing is picked automatically.
+        statusLine.textContent = "נמצאו כמה אפשרויות. בחר/י את הצמח המדויק:";
+        result.candidates.forEach(function (candidate, index) {
+          var li = document.createElement("li");
+          var label = document.createElement("label");
+          var radio = document.createElement("input");
+          radio.type = "radio";
+          radio.name = "plant";
+          radio.value = candidate.plant_id;
+          radio.id = "plant-" + candidate.plant_id;
+
+          var text = document.createElement("span");
+          text.append(candidate.matched_alias, " ");
+          var sci = HE.ltr(candidate.scientific_name);
+          sci.classList.add("sci");
+          text.append(sci);
+
+          var aka = document.createElement("span");
+          aka.className = "aka";
+          aka.textContent = "ידוע גם כ: " + candidate.aliases.join(" · ");
+          text.append(aka);
+
+          radio.addEventListener("change", function () {
+            chosenPlantId = candidate.plant_id;
+            Array.prototype.forEach.call(candidateList.children, function (node, i) {
+              node.classList.toggle("selected", i === index);
+            });
+          });
+
+          label.append(radio, text);
+          li.append(label);
+          candidateList.append(li);
+        });
+        candidateList.hidden = false;
+      }
+
+      herb.addEventListener("input", function () {
+        clearTimeout(timer);
+        var value = herb.value.trim();
+        candidateList.hidden = true;
+        chosenPlantId = null;
+        if (value.length < 2) {
+          statusLine.textContent = "";
+          return;
+        }
+        statusLine.textContent = "מחפש…";
+        timer = setTimeout(function () {
+          HE.api.identify(value).then(renderCandidates).catch(function () {
+            statusLine.textContent = "לא ניתן היה לבדוק את שם הצמח כרגע. אפשר לשלוח בכל זאת.";
+          });
+        }, 300);
+      });
+
+      document.getElementById("form").addEventListener("submit", function (event) {
+        event.preventDefault();
+        HE.clearError(errorBox);
+
+        if (!herb.value.trim()) {
+          HE.showError(errorBox, "שם הצמח הוא שדה חובה.");
+          herb.focus();
+          return;
+        }
+
+        var button = document.getElementById("submit");
+        button.disabled = true;
+        button.textContent = "שולח…";
+
+        function textOrNull(id) {
+          var value = document.getElementById(id).value.trim();
+          return value || null;
+        }
+
+        HE.api.createRequest({
+          herb_input: herb.value.trim(),
+          preparation_input: textOrNull("preparation"),
+          cancer_type_input: textOrNull("cancer"),
+          treatment_input: textOrNull("treatment"),
+          question_input: textOrNull("question"),
+          preparation_unknown: document.getElementById("preparation-unknown").checked,
+          cancer_type_unknown: document.getElementById("cancer-unknown").checked,
+          treatment_unknown: document.getElementById("treatment-unknown").checked,
+          chosen_plant_id: chosenPlantId
+        }).then(function (created) {
+          location.href = "request.html?id=" + encodeURIComponent(created.id) + "&new=1";
+        }).catch(function (err) {
+          button.disabled = false;
+          button.textContent = "שליחת הבקשה";
+          HE.showError(errorBox, err.message || "לא ניתן היה לשלוח את הבקשה.");
+        });
+      });
+    })();
+  </script>
+</body>
+</html>

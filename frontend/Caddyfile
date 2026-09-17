@@ -1,0 +1,31 @@
+{
+	admin off
+	auto_https off
+}
+
+:{$PORT:8080} {
+	root * /srv
+	encode gzip
+	file_server
+
+	header {
+		-Server
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "strict-origin-when-cross-origin"
+		X-Frame-Options "DENY"
+	}
+
+	# config.js is rewritten at container start, so it must never be cached.
+	@config path /config.js
+	header @config Cache-Control "no-store"
+
+	# Assets are not content-hashed, so a browser holding an old copy would keep
+	# running last week's JavaScript against this week's API. Revalidate instead:
+	# 304s stay cheap, and a deploy takes effect immediately.
+	@revalidate path *.html *.js *.css /
+	header @revalidate Cache-Control "no-cache"
+
+	handle_errors {
+		respond "{err.status_code} {err.status_text}"
+	}
+}

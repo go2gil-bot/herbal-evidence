@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>תור הבקשות — Herbal Evidence</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+Hebrew:wght@400;600;700&family=Noto+Sans:wght@400;600&display=swap">
+  <link rel="stylesheet" href="styles.css?v=2">
+</head>
+<body>
+  <div class="env-banner" id="env-banner" hidden>סביבת פיתוח (dev) — הנתונים כאן אינם אמיתיים</div>
+
+  <header class="site-header">
+    <div class="wrap">
+      <div class="brand"><a href="index.html" style="color:inherit;text-decoration:none">Herbal Evidence</a><span>סביבת עבודה — צוות מחקר</span></div>
+      <nav>
+        <a class="btn btn-quiet" href="dashboard.html">התצוגה שלי</a>
+        <button class="btn btn-quiet" type="button" id="signout">יציאה</button>
+      </nav>
+    </div>
+  </header>
+
+  <main class="page wrap">
+    <p class="form-error" id="error" hidden></p>
+
+    <div class="tabs" role="tablist">
+      <button role="tab" id="tab-queue" aria-selected="true">תור הבקשות</button>
+      <button role="tab" id="tab-jobs" aria-selected="false">עבודות ותקלות</button>
+      <button role="tab" id="tab-reviews" aria-selected="false">מאגר הסקירות</button>
+      <button role="tab" id="tab-members" aria-selected="false">ניהול צוות</button>
+    </div>
+
+    <section id="panel-queue">
+      <h1>תור הבקשות</h1>
+      <div class="panel wide" style="margin-bottom:1.5rem">
+        <div style="display:flex;gap:1rem;flex-wrap:wrap;align-items:end">
+          <div class="field" style="flex:1;min-width:12rem;margin:0">
+            <label for="search">חיפוש לפי צמח</label>
+            <input type="text" id="search" autocomplete="off">
+          </div>
+          <div class="field" style="margin:0">
+            <label for="status-filter">סטטוס</label>
+            <select id="status-filter">
+              <option value="">הכול</option>
+              <option value="submitted">התקבלה</option>
+              <option value="needs_clarification">ממתינה להבהרה</option>
+              <option value="queued">בתור</option>
+              <option value="researching">במחקר</option>
+              <option value="draft_ready">טיוטה מוכנה</option>
+              <option value="in_review">בבדיקה</option>
+              <option value="revision_required">נדרשת תיקון</option>
+              <option value="published">פורסמה</option>
+            </select>
+          </div>
+          <div class="field" style="margin:0">
+            <label for="assigned-filter">שיוך</label>
+            <select id="assigned-filter">
+              <option value="any">הכול</option>
+              <option value="me">שלי</option>
+              <option value="unassigned">ללא שיוך</option>
+            </select>
+          </div>
+          <button class="btn btn-primary" type="button" id="refresh">רענון</button>
+        </div>
+      </div>
+      <div class="loading" id="queue-loading">טוען…</div>
+      <ul class="requests" id="queue-list" hidden></ul>
+      <div class="empty" id="queue-empty" hidden>אין בקשות שתואמות את הסינון.</div>
+    </section>
+
+    <section id="panel-jobs" hidden>
+      <h1>עבודות ותקלות</h1>
+      <p class="lede">כישלון עיבוד נשמר על העבודה, לא על הבקשה. המשתמש ממשיך לראות מצב המתנה.</p>
+      <div id="jobs-body" class="loading">טוען…</div>
+    </section>
+
+    <section id="panel-reviews" hidden>
+      <h1>מאגר הסקירות</h1>
+      <p class="lede">סקירות לשימוש חוזר. אינן מכילות מידע אישי של אף משתמש.</p>
+      <div id="reviews-body" class="loading">טוען…</div>
+    </section>
+
+    <section id="panel-members" hidden>
+      <h1>ניהול צוות</h1>
+      <p class="lede">תפקידים מנוהלים על ידי מנהלים בלבד. משתמש אינו יכול לקדם את עצמו.</p>
+      <div id="members-body" class="loading">טוען…</div>
+    </section>
+  </main>
+
+  <script src="config.js"></script>
+  <script src="core.js?v=2"></script>
+  <script>
+    (function () {
+      "use strict";
+      HE.markDevEnvironment();
+      if (!HE.auth.requireSession()) return;
+      document.getElementById("signout").addEventListener("click", HE.auth.signOut);
+
+      var errorBox = document.getElementById("error");
+
+      function fail(err) {
+        if (err && err.status === 403) {
+          HE.showError(errorBox, "החשבון הזה אינו חלק מצוות המחקר.");
+        } else {
+          HE.showError(errorBox, (err && err.message) || "שגיאה בטעינה.");
+        }
+      }
+
+      var panels = ["queue", "jobs", "reviews", "members"];
+      var loaded = {};
+      panels.forEach(function (name) {
+        document.getElementById("tab-" + name).addEventListener("click", function () {
+          HE.clearError(errorBox);
+          panels.forEach(function (other) {
+            var on = other === name;
+            document.getElementById("tab-" + other).setAttribute("aria-selected", String(on));
+            document.getElementById("panel-" + other).hidden = !on;
+          });
+          if (!loaded[name]) { loaded[name] = true; LOADERS[name](); }
+        });
+      });
+
+      /* --- queue ---------------------------------------------------------- */
+
+      function loadQueue() {
+        var list = document.getElementById("queue-list");
+        var empty = document.getElementById("queue-empty");
+        var loading = document.getElementById("queue-loading");
+        list.textContent = "";
+        list.hidden = true;
+        empty.hidden = true;
+        loading.hidden = false;
+
+        var query = { assigned: document.getElementById("assigned-filter").value };
+        var search = document.getElementById("search").value.trim();
+        var statusValue = document.getElementById("status-filter").value;
+        if (search) query.search = search;
+        if (statusValue) query.status = statusValue;
+
+        HE.api.staff.queue(query).then(function (page) {
+          loading.hidden = true;
+          if (!page.items.length) { empty.hidden = false; return; }
+          page.items.forEach(function (item) {
+            var li = document.createElement("li");
+            var link = document.createElement("a");
+            link.href = "staff-request.html?id=" + encodeURIComponent(item.id);
+
+            var left = document.createElement("div");
+            var title = document.createElement("div");
+            title.innerHTML = '<span class="num">בקשה ' + item.id + "</span> · ";
+            title.append(item.herb_input + (item.preparation_input ? " · " + item.preparation_input : ""));
+            var meta = document.createElement("div");
+            meta.className = "meta";
+            meta.textContent = "גיל: " + item.age_days + " ימים · " +
+              (item.assigned_researcher_id ? "משויכת" : "ללא שיוך");
+            left.append(title, meta);
+
+            var badge = document.createElement("span");
+            badge.className = "status";
+            badge.textContent = HE.INTERNAL_STATUS_TEXT[item.status] || item.status;
+
+            link.append(left, badge);
+            li.append(link);
+            list.append(li);
+          });
+          list.hidden = false;
+        }).catch(function (err) { loading.hidden = true; fail(err); });
+      }
+
+      document.getElementById("refresh").addEventListener("click", loadQueue);
+      ["search", "status-filter", "assigned-filter"].forEach(function (id) {
+        document.getElementById(id).addEventListener("change", loadQueue);
+      });
+
+      /* --- jobs ----------------------------------------------------------- */
+
+      function loadJobs() {
+        var container = document.getElementById("jobs-body");
+        HE.api.staff.jobs().then(function (data) {
+          container.className = "";
+          container.textContent = "";
+          if (!data.jobs.length) {
+            container.className = "empty";
+            container.textContent = "אין עבודות.";
+            return;
+          }
+          data.jobs.forEach(function (job) {
+            var panel = document.createElement("div");
+            panel.className = "panel wide";
+            panel.style.marginBottom = "1rem";
+
+            var head = document.createElement("div");
+            head.innerHTML = "<strong>עבודה " + job.id + "</strong> · " + job.job_type +
+              " · בקשה " + job.request_id;
+            var badge = document.createElement("span");
+            badge.className = "status";
+            badge.style.marginInlineStart = ".6rem";
+            badge.textContent = HE.JOB_STATE_TEXT[job.state] || job.state;
+            head.append(badge);
+            panel.append(head);
+
+            var meta = document.createElement("p");
+            meta.className = "hint";
+            meta.textContent = "ניסיונות: " + job.attempts + " מתוך " + job.max_attempts;
+            panel.append(meta);
+
+            if (job.last_error) {
+              var err = document.createElement("pre");
+              err.style.cssText = "background:var(--paper);padding:.8rem;border-radius:8px;overflow:auto;font-size:.85rem";
+              err.dir = "ltr";
+              err.textContent = JSON.stringify(job.last_error, null, 2);
+              panel.append(err);
+            }
+
+            if (job.state === "failed" || job.state === "dead") {
+              var retry = document.createElement("button");
+              retry.className = "btn btn-quiet";
+              retry.type = "button";
+              retry.textContent = "הרצה מחדש";
+              retry.addEventListener("click", function () {
+                retry.disabled = true;
+                HE.api.staff.retryJob(job.id).then(loadJobs).catch(fail);
+              });
+              panel.append(retry);
+            }
+            container.append(panel);
+          });
+        }).catch(function (err) { container.className = ""; fail(err); });
+      }
+
+      /* --- reviews -------------------------------------------------------- */
+
+      function loadReviews() {
+        var container = document.getElementById("reviews-body");
+        HE.api.staff.reviews().then(function (data) {
+          container.className = "";
+          container.textContent = "";
+          if (!data.items.length) {
+            container.className = "empty";
+            container.textContent = "המאגר ריק.";
+            return;
+          }
+          data.items.forEach(function (item) {
+            var panel = document.createElement("div");
+            panel.className = "panel wide";
+            panel.style.marginBottom = "1rem";
+            var question = (item.reviews && item.reviews.research_questions &&
+              item.reviews.research_questions.normalized_question) || "—";
+            panel.innerHTML = "<strong>" + question + "</strong>";
+            var meta = document.createElement("p");
+            meta.className = "hint";
+            meta.textContent = "גרסה " + item.version +
+              " · תאריך חיפוש: " + (item.literature_search_date || "—") +
+              " · מאושרת: " + (item.approved_at ? HE.formatDate(item.approved_at) : "לא") +
+              " · מקורות: " + ((item.source_ids || []).length);
+            panel.append(meta);
+            container.append(panel);
+          });
+        }).catch(function (err) { container.className = ""; fail(err); });
+      }
+
+      /* --- members -------------------------------------------------------- */
+
+      function loadMembers() {
+        var container = document.getElementById("members-body");
+        HE.api.staff.members().then(function (data) {
+          container.className = "";
+          container.textContent = "";
+
+          var table = document.createElement("table");
+          table.style.cssText = "width:100%;border-collapse:collapse";
+          table.innerHTML = "<thead><tr><th style='text-align:start;padding:.5rem'>משתמש</th>" +
+            "<th style='text-align:start;padding:.5rem'>תפקיד</th></tr></thead>";
+          var tbody = document.createElement("tbody");
+          data.items.forEach(function (row) {
+            var tr = document.createElement("tr");
+            var td1 = document.createElement("td");
+            td1.style.padding = ".5rem";
+            td1.append(HE.ltr(row.user_id));
+            var td2 = document.createElement("td");
+            td2.style.padding = ".5rem";
+            td2.textContent = row.role === "admin" ? "מנהל" : "חוקר";
+            tr.append(td1, td2);
+            tbody.append(tr);
+          });
+          table.append(tbody);
+
+          var panel = document.createElement("div");
+          panel.className = "panel wide";
+          panel.append(table);
+          container.append(panel);
+
+          var form = document.createElement("form");
+          form.className = "panel wide";
+          form.style.marginTop = "1rem";
+          form.innerHTML =
+            '<div class="field"><label for="new-user">מזהה משתמש</label>' +
+            '<input type="text" id="new-user" dir="ltr" required></div>' +
+            '<div class="field"><label for="new-role">תפקיד</label>' +
+            '<select id="new-role"><option value="researcher">חוקר</option><option value="admin">מנהל</option></select></div>' +
+            '<button class="btn btn-primary" type="submit">הענקת תפקיד</button>';
+          form.addEventListener("submit", function (event) {
+            event.preventDefault();
+            HE.api.staff.grantRole(
+              document.getElementById("new-user").value.trim(),
+              document.getElementById("new-role").value
+            ).then(loadMembers).catch(fail);
+          });
+          container.append(form);
+        }).catch(function (err) { container.className = ""; fail(err); });
+      }
+
+      var LOADERS = { queue: loadQueue, jobs: loadJobs, reviews: loadReviews, members: loadMembers };
+      loaded.queue = true;
+      loadQueue();
+    })();
+  </script>
+</body>
+</html>
