@@ -44,6 +44,9 @@ class Settings(BaseSettings):
     ai_api_key: str = Field(default="", repr=False)
 
     ncbi_api_key: str = Field(default="", repr=False)
+    # NCBI asks callers to identify themselves. Not hardcoded: sending someone's
+    # address to a third party is their decision, so it stays configuration.
+    ncbi_contact_email: str = ""
 
     @property
     def allowed_origins(self) -> list[str]:

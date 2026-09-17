@@ -93,6 +93,9 @@ def ready() -> Ready:
         "supabase_secret_key": "set" if settings.supabase_secret_key else "missing",
         "cors_origins": "set" if settings.allowed_origins else "missing",
         "ai_provider": settings.ai_provider,
+        # Presence only. A key is never echoed, not even partially.
+        "ai_api_key": "set" if settings.ai_api_key else "missing",
+        "ai_model": settings.ai_model or "missing",
     }
     # Phase 1 has no database yet, so readiness is configuration-only.
     return Ready(ready=True, checks=checks)
