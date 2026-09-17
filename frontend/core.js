@@ -169,7 +169,81 @@
         "/api/v1/requests/" + requestId + "/clarifications/" + clarificationId,
         { answer: answer }
       );
+    },
+
+    /* --- staff. A 403 here means the signed-in account has no role. ------- */
+    staff: {
+      queue: function (query) {
+        var qs = new URLSearchParams(query || {}).toString();
+        return call("GET", "/api/v1/staff/queue" + (qs ? "?" + qs : ""));
+      },
+      request: function (id) { return call("GET", "/api/v1/staff/requests/" + id); },
+      assign: function (id, researcherId) {
+        return call("POST", "/api/v1/staff/requests/" + id + "/assign", { researcher_id: researcherId });
+      },
+      setStatus: function (id, status, reason) {
+        return call("POST", "/api/v1/staff/requests/" + id + "/status", { status: status, closed_reason: reason || null });
+      },
+      askClarification: function (id, question) {
+        return call("POST", "/api/v1/staff/requests/" + id + "/clarifications", { question: question });
+      },
+      enqueue: function (id, jobType) {
+        return call("POST", "/api/v1/staff/requests/" + id + "/jobs", { job_type: jobType });
+      },
+      createDraft: function (id, body) {
+        return call("POST", "/api/v1/staff/requests/" + id + "/drafts", { body: body, source_ids: [] });
+      },
+      getDraft: function (versionId) { return call("GET", "/api/v1/staff/drafts/" + versionId); },
+      saveDraft: function (versionId, body, sourceIds) {
+        return call("PATCH", "/api/v1/staff/drafts/" + versionId, { body: body, source_ids: sourceIds || [] });
+      },
+      approve: function (versionId, hash, checks) {
+        return call("POST", "/api/v1/staff/drafts/" + versionId + "/approve", {
+          expected_content_hash: hash,
+          checked_sources: checks.sources,
+          checked_claim_evidence_alignment: checks.alignment,
+          checked_limitations: checks.limitations,
+          checked_user_wording: checks.wording
+        });
+      },
+      withdraw: function (versionId, reason) {
+        return call("POST", "/api/v1/staff/responses/" + versionId + "/withdraw", { reason: reason });
+      },
+      sources: function (search) {
+        return call("GET", "/api/v1/staff/sources" + (search ? "?search=" + encodeURIComponent(search) : ""));
+      },
+      addSource: function (source) { return call("POST", "/api/v1/staff/sources", source); },
+      jobs: function (state) {
+        return call("GET", "/api/v1/staff/jobs" + (state ? "?state=" + encodeURIComponent(state) : ""));
+      },
+      retryJob: function (jobId) { return call("POST", "/api/v1/staff/jobs/" + jobId + "/retry"); },
+      reviews: function () { return call("GET", "/api/v1/staff/reviews"); },
+      members: function () { return call("GET", "/api/v1/staff/members"); },
+      grantRole: function (userId, role) {
+        return call("POST", "/api/v1/staff/members", { user_id: userId, role: role });
+      }
     }
+  };
+
+  /* Internal statuses. Staff see these; requesters never do. */
+  var INTERNAL_STATUS_TEXT = {
+    submitted: "התקבלה",
+    needs_clarification: "ממתינה להבהרה",
+    queued: "בתור",
+    researching: "במחקר",
+    draft_ready: "טיוטה מוכנה",
+    in_review: "בבדיקה",
+    revision_required: "נדרשת תיקון",
+    published: "פורסמה",
+    closed_out_of_scope: "נסגרה — מחוץ להיקף"
+  };
+
+  var JOB_STATE_TEXT = {
+    queued: "בתור",
+    running: "רצה",
+    succeeded: "הסתיימה",
+    failed: "נכשלה",
+    dead: "נכשלה סופית"
   };
 
   /* --- presentation ----------------------------------------------------- */
@@ -227,6 +301,8 @@
 
   global.HE = {
     config: config,
+    INTERNAL_STATUS_TEXT: INTERNAL_STATUS_TEXT,
+    JOB_STATE_TEXT: JOB_STATE_TEXT,
     auth: auth,
     api: api,
     STATUS_TEXT: STATUS_TEXT,

@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>בקשה — סביבת הצוות</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+Hebrew:wght@400;600;700&family=Noto+Sans:wght@400;600&display=swap">
+  <link rel="stylesheet" href="styles.css?v=2">
+</head>
+<body>
+  <div class="env-banner" id="env-banner" hidden>סביבת פיתוח (dev) — הנתונים כאן אינם אמיתיים</div>
+
+  <header class="site-header">
+    <div class="wrap">
+      <div class="brand"><a href="staff.html" style="color:inherit;text-decoration:none">Herbal Evidence</a><span>סביבת עבודה — צוות מחקר</span></div>
+      <nav><a class="btn btn-quiet" href="staff.html">חזרה לתור</a></nav>
+    </div>
+  </header>
+
+  <main class="page wrap">
+    <p class="form-error" id="error" hidden></p>
+    <p class="form-note" id="note" hidden></p>
+    <div class="loading" id="loading">טוען…</div>
+
+    <div id="content" hidden>
+      <h1 id="title"></h1>
+      <p><span class="status" id="status"></span> <span class="hint" id="assigned"></span></p>
+
+      <section class="panel wide">
+        <h2 style="font-size:1.05rem;margin:0 0 1rem">מה נשלח</h2>
+        <dl class="summary-grid" id="summary"></dl>
+      </section>
+
+      <section class="panel wide" style="margin-top:1.5rem">
+        <h2 style="font-size:1.05rem;margin:0 0 1rem">פעולות</h2>
+        <div style="display:flex;gap:.6rem;flex-wrap:wrap;margin-bottom:1rem">
+          <button class="btn btn-quiet" type="button" data-status="researching">התחלת מחקר</button>
+          <button class="btn btn-quiet" type="button" data-status="draft_ready">סימון טיוטה מוכנה</button>
+          <button class="btn btn-quiet" type="button" data-status="in_review">העברה לבדיקה</button>
+          <button class="btn btn-quiet" type="button" data-status="revision_required">נדרשת תיקון</button>
+          <button class="btn btn-quiet" type="button" id="enqueue-identify">הרצת זיהוי צמח</button>
+          <button class="btn btn-quiet" type="button" id="enqueue-draft">יצירת טיוטה (AI)</button>
+          <button class="btn btn-primary" type="button" id="new-draft">טיוטה חדשה ידנית</button>
+        </div>
+
+        <form id="clarify-form" style="border-top:1px solid var(--line);padding-top:1rem">
+          <div class="field">
+            <label for="clarify">שאלת הבהרה למשתמש</label>
+            <span class="hint">שאלה קצרה ומובנית. לא צ׳אט.</span>
+            <textarea id="clarify" maxlength="1000"></textarea>
+          </div>
+          <button class="btn btn-quiet" type="submit">שליחת ההבהרה</button>
+        </form>
+
+        <form id="close-form" style="border-top:1px solid var(--line);padding-top:1rem;margin-top:1rem">
+          <div class="field">
+            <label for="close-reason">סגירה — הסבר שיוצג למשתמש</label>
+            <input type="text" id="close-reason" maxlength="500">
+          </div>
+          <button class="btn btn-quiet" type="submit">סגירת הבקשה</button>
+        </form>
+      </section>
+
+      <section id="clarifications-section" hidden style="margin-top:1.5rem">
+        <h2 style="font-size:1.2rem">היסטוריית הבהרות</h2>
+        <div id="clarifications"></div>
+      </section>
+
+      <section style="margin-top:1.5rem">
+        <h2 style="font-size:1.2rem">גרסאות</h2>
+        <div id="versions"></div>
+      </section>
+
+      <section style="margin-top:1.5rem">
+        <h2 style="font-size:1.2rem">עבודות</h2>
+        <div id="jobs"></div>
+      </section>
+    </div>
+  </main>
+
+  <script src="config.js"></script>
+  <script src="core.js?v=2"></script>
+  <script>
+    (function () {
+      "use strict";
+      HE.markDevEnvironment();
+      if (!HE.auth.requireSession()) return;
+
+      var params = new URLSearchParams(location.search);
+      var requestId = params.get("id");
+      var errorBox = document.getElementById("error");
+      var noteBox = document.getElementById("note");
+
+      if (!requestId || !/^\d+$/.test(requestId)) {
+        document.getElementById("loading").hidden = true;
+        HE.showError(errorBox, "מזהה בקשה לא תקין.");
+        return;
+      }
+
+      function fail(err) {
+        if (err && err.status === 403) HE.showError(errorBox, "הבקשה הזו אינה בהיקף ההרשאה שלך.");
+        else HE.showError(errorBox, (err && err.message) || "שגיאה.");
+      }
+
+      function note(message) { noteBox.textContent = message; noteBox.hidden = false; }
+
+      function addRow(dl, term, value) {
+        if (value === null || value === undefined || value === "") return;
+        var dt = document.createElement("dt");
+        dt.textContent = term;
+        var dd = document.createElement("dd");
+        if (value instanceof Node) dd.append(value); else dd.textContent = value;
+        dl.append(dt, dd);
+      }
+
+      function load() {
+        HE.api.staff.request(requestId).then(function (data) {
+          document.getElementById("loading").hidden = true;
+          document.getElementById("content").hidden = false;
+          HE.clearError(errorBox);
+
+          var request = data.request;
+          document.getElementById("title").textContent = "בקשה " + request.id + " · " + request.herb_input;
+          document.getElementById("status").textContent =
+            HE.INTERNAL_STATUS_TEXT[request.status] || request.status;
+          document.getElementById("assigned").textContent =
+            request.assigned_researcher_id ? "משויכת לחוקר" : "ללא שיוך";
+
+          var summary = document.getElementById("summary");
+          summary.textContent = "";
+          addRow(summary, "שם הצמח", request.herb_input);
+          if (request.plants) addRow(summary, "זוהה כ", HE.ltr(request.plants.scientific_name));
+          addRow(summary, "מצב הזיהוי", HE.IDENTIFICATION_TEXT[request.identification_state]);
+          addRow(summary, "תכשיר", request.preparation_unknown ? "לא ידוע" : request.preparation_input);
+          addRow(summary, "סוג סרטן", request.cancer_type_unknown ? "לא ידוע" : request.cancer_type_input);
+          addRow(summary, "טיפול", request.treatment_unknown ? "לא ידוע" : request.treatment_input);
+          addRow(summary, "שאלת המשתמש", request.question_input);
+          addRow(summary, "נשלחה", HE.formatDate(request.created_at));
+
+          var clarSection = document.getElementById("clarifications-section");
+          var clar = document.getElementById("clarifications");
+          clar.textContent = "";
+          if (data.clarifications.length) {
+            clarSection.hidden = false;
+            data.clarifications.forEach(function (item) {
+              var panel = document.createElement("div");
+              panel.className = "panel wide";
+              panel.style.marginBottom = ".8rem";
+              panel.innerHTML = "<strong>" + item.question + "</strong>";
+              var answer = document.createElement("p");
+              answer.textContent = item.answer ? "תשובה: " + item.answer : "ממתין לתשובת המשתמש";
+              if (!item.answer) answer.className = "hint";
+              panel.append(answer);
+              clar.append(panel);
+            });
+          }
+
+          var versions = document.getElementById("versions");
+          versions.textContent = "";
+          if (!data.versions.length) {
+            versions.className = "empty";
+            versions.textContent = "אין עדיין גרסאות.";
+          } else {
+            versions.className = "";
+            data.versions.forEach(function (version) {
+              var panel = document.createElement("div");
+              panel.className = "panel wide";
+              panel.style.marginBottom = ".8rem";
+
+              var head = document.createElement("div");
+              head.innerHTML = "<strong>גרסה " + version.version + "</strong>";
+              var badge = document.createElement("span");
+              badge.className = "status";
+              badge.style.marginInlineStart = ".6rem";
+              badge.textContent = { draft: "טיוטה", published: "מפורסמת",
+                superseded: "הוחלפה", withdrawn: "נמשכה" }[version.state] || version.state;
+              head.append(badge);
+              panel.append(head);
+
+              if (version.state === "draft") {
+                var edit = document.createElement("a");
+                edit.className = "btn btn-primary";
+                edit.style.marginTop = ".6rem";
+                edit.href = "review.html?version=" + version.id;
+                edit.textContent = "פתיחה בעורך";
+                panel.append(edit);
+              }
+
+              if (version.state === "published") {
+                var form = document.createElement("form");
+                form.style.marginTop = ".6rem";
+                form.innerHTML = '<div class="field"><label>סיבת המשיכה</label>' +
+                  '<input type="text" maxlength="500" required></div>';
+                var button = document.createElement("button");
+                button.className = "btn btn-quiet";
+                button.type = "submit";
+                button.textContent = "משיכת התשובה";
+                form.append(button);
+                form.addEventListener("submit", function (event) {
+                  event.preventDefault();
+                  var reason = form.querySelector("input").value.trim();
+                  if (!reason) return;
+                  HE.api.staff.withdraw(version.id, reason)
+                    .then(function () { note("התשובה נמשכה."); load(); })
+                    .catch(fail);
+                });
+                panel.append(form);
+              }
+
+              if (version.withdrawn_reason) {
+                var why = document.createElement("p");
+                why.className = "hint";
+                why.textContent = "סיבת משיכה: " + version.withdrawn_reason;
+                panel.append(why);
+              }
+              versions.append(panel);
+            });
+          }
+
+          var jobs = document.getElementById("jobs");
+          jobs.textContent = "";
+          if (!data.jobs.length) {
+            jobs.className = "empty";
+            jobs.textContent = "אין עבודות.";
+          } else {
+            jobs.className = "";
+            data.jobs.forEach(function (job) {
+              var panel = document.createElement("div");
+              panel.className = "panel wide";
+              panel.style.marginBottom = ".8rem";
+              var head = document.createElement("div");
+              head.innerHTML = "<strong>" + job.job_type + "</strong>";
+              var badge = document.createElement("span");
+              badge.className = "status";
+              badge.style.marginInlineStart = ".6rem";
+              badge.textContent = HE.JOB_STATE_TEXT[job.state] || job.state;
+              head.append(badge);
+              panel.append(head);
+              if (job.last_error) {
+                var pre = document.createElement("pre");
+                pre.dir = "ltr";
+                pre.style.cssText = "background:var(--paper);padding:.7rem;border-radius:8px;overflow:auto;font-size:.85rem";
+                pre.textContent = JSON.stringify(job.last_error, null, 2);
+                panel.append(pre);
+              }
+              jobs.append(panel);
+            });
+          }
+        }).catch(function (err) {
+          document.getElementById("loading").hidden = true;
+          fail(err);
+        });
+      }
+
+      document.querySelectorAll("[data-status]").forEach(function (button) {
+        button.addEventListener("click", function () {
+          HE.clearError(errorBox);
+          HE.api.staff.setStatus(requestId, button.dataset.status)
+            .then(function () { note("הסטטוס עודכן."); load(); })
+            .catch(fail);
+        });
+      });
+
+      document.getElementById("enqueue-identify").addEventListener("click", function () {
+        HE.api.staff.enqueue(requestId, "identify_plant")
+          .then(function () { note("העבודה נכנסה לתור."); setTimeout(load, 2000); })
+          .catch(fail);
+      });
+
+      document.getElementById("enqueue-draft").addEventListener("click", function () {
+        HE.api.staff.enqueue(requestId, "draft")
+          .then(function () { note("העבודה נכנסה לתור. אם אין ספק AI מוגדר, תופיע תקלה."); setTimeout(load, 2500); })
+          .catch(fail);
+      });
+
+      document.getElementById("new-draft").addEventListener("click", function () {
+        HE.api.staff.createDraft(requestId, {
+          question: "", conclusion: "", certainty: "", certainty_explanation: "",
+          safety: "", limitations: "", preclinical: "", sources: []
+        }).then(function (created) {
+          location.href = "review.html?version=" + created.id;
+        }).catch(fail);
+      });
+
+      document.getElementById("clarify-form").addEventListener("submit", function (event) {
+        event.preventDefault();
+        var value = document.getElementById("clarify").value.trim();
+        if (!value) return;
+        HE.api.staff.askClarification(requestId, value).then(function () {
+          document.getElementById("clarify").value = "";
+          note("ההבהרה נשלחה.");
+          load();
+        }).catch(fail);
+      });
+
+      document.getElementById("close-form").addEventListener("submit", function (event) {
+        event.preventDefault();
+        var reason = document.getElementById("close-reason").value.trim();
+        HE.api.staff.setStatus(requestId, "closed_out_of_scope", reason)
+          .then(function () { note("הבקשה נסגרה."); load(); })
+          .catch(fail);
+      });
+
+      load();
+    })();
+  </script>
+</body>
+</html>

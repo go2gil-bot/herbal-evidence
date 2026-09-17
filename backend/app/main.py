@@ -4,21 +4,45 @@ Phase 4: the requester-facing journey is live under /api/v1. The research
 workflow, the staff workspace and the job queue arrive in later phases.
 """
 
+import asyncio
+import contextlib
 import logging
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from app.api.v1.router import router as v1_router
+from app.api.v1.staff import router as staff_router
 from app.config import get_settings
+from app.jobs import worker as job_worker
 
 settings = get_settings()
 
 logging.basicConfig(level=settings.log_level)
 logger = logging.getLogger("herbal_evidence")
 
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    """Run the job consumer for as long as the service is up.
+
+    The queue is durable in Postgres, so a shutdown here loses nothing: whatever
+    was in flight has a lease that expires and is picked up again.
+    """
+    stop = asyncio.Event()
+    task = asyncio.create_task(job_worker.run_forever(stop))
+    try:
+        yield
+    finally:
+        stop.set()
+        task.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await task
+
+
 app = FastAPI(
+    lifespan=lifespan,
     title="Herbal Evidence API",
     version="0.1.0",
     docs_url="/docs" if settings.is_dev else None,
@@ -52,6 +76,7 @@ class Ready(BaseModel):
 
 
 app.include_router(v1_router)
+app.include_router(staff_router)
 
 
 @app.get("/health", response_model=Health, tags=["ops"])
