@@ -23,6 +23,19 @@ import time
 import urllib.error
 import urllib.request
 
+# This machine's bundled certifi roots are stale, so a freshly issued Railway
+# certificate fails verification here while curl (which uses the OS store)
+# accepts it. Prefer the operating system's trust store when truststore is
+# available. Verification stays ON either way - disabling it would make every
+# check below meaningless over TLS.
+try:
+    import truststore
+
+    truststore.inject_into_ssl()
+except ImportError:
+    pass
+
+
 ENV_PATH = pathlib.Path(__file__).resolve().parents[1] / ".env"
 API = os.environ.get("API", "http://localhost:8000")
 EMAIL = os.environ.get("STAFF_EMAIL", "demo-dev@example.test")
