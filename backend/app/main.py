@@ -14,6 +14,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from app.api.v1.router import router as v1_router
+from app.api.v1.pilot import router as pilot_router, staff_router as pilot_staff_router
 from app.api.v1.staff import router as staff_router
 from app.config import get_settings
 from app.jobs import worker as job_worker
@@ -77,6 +78,8 @@ class Ready(BaseModel):
 
 app.include_router(v1_router)
 app.include_router(staff_router)
+app.include_router(pilot_router)
+app.include_router(pilot_staff_router)
 
 
 @app.get("/health", response_model=Health, tags=["ops"])

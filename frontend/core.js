@@ -171,6 +171,11 @@
       );
     },
 
+    pilot: {
+      questionnaire: function () { return call("GET", "/api/v1/pilot/questionnaire"); },
+      submit: function (payload) { return call("POST", "/api/v1/pilot/assessments", payload); }
+    },
+
     /* --- staff. A 403 here means the signed-in account has no role. ------- */
     staff: {
       queue: function (query) {
@@ -218,6 +223,10 @@
       },
       retryJob: function (jobId) { return call("POST", "/api/v1/staff/jobs/" + jobId + "/retry"); },
       reviews: function () { return call("GET", "/api/v1/staff/reviews"); },
+      setAnswerKey: function (versionId, answers) {
+        return call("POST", "/api/v1/staff/drafts/" + versionId + "/answer-key", { answers: answers });
+      },
+      pilotResults: function () { return call("GET", "/api/v1/staff/pilot/results"); },
       members: function () { return call("GET", "/api/v1/staff/members"); },
       grantRole: function (userId, role) {
         return call("POST", "/api/v1/staff/members", { user_id: userId, role: role });
