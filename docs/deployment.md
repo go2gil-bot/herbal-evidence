@@ -166,11 +166,56 @@ it directly:
 
 ## Auth email
 
+### What is configured
+
+Both projects had `site_url` still set to Supabase's default
+`http://localhost:3000`, which means every verification and recovery link
+pointed at a machine that was not the user's. Fixed 2026-09-17:
+
+| Project | `site_url` | Redirects allowed |
+|---|---|---|
+| dev | `https://frontend-dev-62e0.up.railway.app` | its own `/auth.html`, plus `http://localhost:4173/auth.html` |
+| production | `https://frontend-production-ed33.up.railway.app` | its own `/auth.html`, twice |
+
+Production's allow-list deliberately contains no loopback address.
+
+Apply or inspect with:
+
+```bash
+scripts/auth-config.sh dev diff
+scripts/auth-config.sh production push
+```
+
+Read the diff before pushing. `config push` only applies what `config.toml`
+declares - ten hosted properties it does not mention are left alone - but a
+non-interactive push defaults to proceeding, so the diff is the only review step.
+
+### What is still missing: a sender
+
 Supabase's built-in email sender is rate limited to a handful of messages per
-hour and is documented as being for testing only. Before real users:
+hour and is documented as being for testing only. **Registration works, but the
+verification email will often not arrive.** Until an SMTP provider is configured,
+do not open the production site to real users.
 
-- configure SMTP in the Supabase dashboard (Authentication -> Emails), and
-- set the Site URL and redirect allow-list per project, so verification links
-  point at the right frontend for that environment.
+To finish it:
 
-Until then registration works, but verification emails will be unreliable.
+1. Choose a provider and create an account there. A pilot needs very little
+   volume; the deciding factor is usually whether you have a domain to send from.
+2. Put the credentials in `supabase/.env` (gitignored):
+
+   ```
+   SMTP_HOST=...
+   SMTP_USER=...
+   SMTP_PASS=...
+   SMTP_SENDER=no-reply@yourdomain
+   ```
+
+3. Uncomment the `[auth.email.smtp]` block at the bottom of
+   `supabase/config.toml`, and export those four variables in
+   `scripts/auth-config.sh` for each environment.
+4. `scripts/auth-config.sh dev diff`, read it, then `push`. Test a real
+   registration on dev before touching production.
+
+The block is commented rather than declared-and-empty on purpose: a declared
+empty SMTP block would be pushed as empty and would break sending rather than
+leave it alone.
