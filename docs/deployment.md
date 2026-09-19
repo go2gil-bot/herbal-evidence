@@ -166,11 +166,86 @@ it directly:
 
 ## Auth email
 
+### What is configured
+
+Both projects had `site_url` still set to Supabase's default
+`http://localhost:3000`, which means every verification and recovery link
+pointed at a machine that was not the user's. Fixed 2026-09-17:
+
+| Project | `site_url` | Redirects allowed |
+|---|---|---|
+| dev | `https://frontend-dev-62e0.up.railway.app` | its own `/auth.html`, plus `http://localhost:4173/auth.html` |
+| production | `https://frontend-production-ed33.up.railway.app` | its own `/auth.html`, twice |
+
+Production's allow-list deliberately contains no loopback address.
+
+Apply or inspect with:
+
+```bash
+scripts/auth-config.sh dev diff
+scripts/auth-config.sh production push
+```
+
+Read the diff before pushing. `config push` only applies what `config.toml`
+declares - ten hosted properties it does not mention are left alone - but a
+non-interactive push defaults to proceeding, so the diff is the only review step.
+
+### What is still missing: a sender
+
 Supabase's built-in email sender is rate limited to a handful of messages per
-hour and is documented as being for testing only. Before real users:
+hour and is documented as being for testing only. **Registration works, but the
+verification email will often not arrive.** Until SMTP is configured, do not open
+the production site to real users.
 
-- configure SMTP in the Supabase dashboard (Authentication -> Emails), and
-- set the Site URL and redirect allow-list per project, so verification links
-  point at the right frontend for that environment.
+Chosen provider: **Brevo** (free tier, 300 messages/day, no domain required).
 
-Until then registration works, but verification emails will be unreliable.
+1. In Brevo: verify a sender address, then create an **SMTP key** under
+   SMTP & API. The SMTP login is usually `something@smtp-brevo.com` - it is not
+   the account email - and the password is that key, not the account password.
+2. Put the values in `supabase/.env` (gitignored), **per environment** - generate
+   a separate SMTP key for each, so revoking one does not stop the other sending:
+
+   ```
+   SMTP_HOST=smtp-relay.brevo.com
+
+   DEV_SMTP_USER=<the SMTP login Brevo shows>
+   DEV_SMTP_PASS=<the key for the dev SMTP key>
+   DEV_SMTP_SENDER=<the verified sender address>
+
+   PROD_SMTP_USER=<the SMTP login Brevo shows>
+   PROD_SMTP_PASS=<the key for the production SMTP key>
+   PROD_SMTP_SENDER=<the verified sender address>
+   ```
+
+3. `scripts/auth-config.sh dev diff`, read it, then `push`.
+4. Register a real address on dev and confirm the email arrives before touching
+   production.
+
+The script includes `supabase/config.smtp.toml` **only when all four variables
+are non-empty**. This is not caution for its own sake: with a variable missing,
+the CLI passes `env(SMTP_HOST)` through as that literal string and still sets
+`enabled = true`, so a half-configured push enables SMTP with nonsense and breaks
+sending outright. All four, or none.
+
+#### Two things that will silently stop sending
+
+- **Brevo requires phone verification** before it will send anything. Without it
+  the relay accepts the connection and nothing arrives, which reads like a
+  configuration bug and is not one.
+- **An SMTP key expires after 90 days of inactivity**, regardless of the expiry
+  date chosen. A pilot that pauses for a quarter comes back with dead credentials.
+
+Do **not** enable Brevo's "block unauthorized IP addresses for SMTP keys". The
+backend runs on Railway and its egress address changes between deploys; turning
+that on breaks sending the first time a container moves.
+
+#### Deliverability without a domain
+
+Sending from a free webmail address (`@gmail.com`, `@outlook.com`) through a
+third-party relay fails those providers' DMARC policy, so messages are commonly
+rejected or filed as spam by the recipient. Brevo restricts this for that reason.
+
+For a small pilot where participants are told to expect the email, this is
+usually survivable. For anything wider, a domain - about $10/year - plus the DNS
+records Brevo asks for is the actual fix, and it is the difference between
+"verification emails work" and "verification emails sometimes work".

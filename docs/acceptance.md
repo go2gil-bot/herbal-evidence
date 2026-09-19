@@ -60,6 +60,25 @@ five reference plants, RLS on all 17 tables, security advisors clean.
 `yes`. That guard is tested - running it without the setting fails with
 `P0001: refusing to seed mock data`.
 
+## Auth email, verified 2026-09-19
+
+A confirmation email sent through Brevo from the dev project reached a real
+Gmail inbox. Following a link is verified separately for each outcome, because
+until 2026-09-19 all three rendered the same plain login form:
+
+| Link outcome | What the page does |
+|---|---|
+| Confirmed | Says so, signs the person in, offers the dashboard |
+| Expired (`otp_expired`) | Says the link expired and offers to send a new one |
+| Recovery | Opens the form that sets a new password |
+
+Checked against the deployed `dev` site, not only locally. The resend reports
+the same message whether or not the address exists.
+
+Not established: that mail reaches inboxes rather than spam folders at any
+volume. The sender is a free webmail address and fails the recipient's DMARC
+check - see `docs/limitations.md`.
+
 ## What these tests do not establish
 
 **Automated structural and permission tests do not establish scientific

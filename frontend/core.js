@@ -70,12 +70,27 @@
     });
   }
 
+  // Where an emailed link comes back to. GoTrue takes this as a query
+  // parameter; an `options.email_redirect_to` in the body is a supabase-js
+  // convention that this REST API ignores without complaining, which sent
+  // people to the project's Site URL instead of a page that can greet them.
+  function linkTarget() {
+    return global.location.origin + "/auth.html";
+  }
+
   var auth = {
     signUp: function (email, password) {
-      return authFetch("/signup", {
+      return authFetch("/signup?redirect_to=" + encodeURIComponent(linkTarget()), {
         email: email,
-        password: password,
-        options: { email_redirect_to: global.location.origin + "/auth.html?verified=1" }
+        password: password
+      });
+    },
+
+    // A confirmation link expires. Without this, an expired link is a dead end.
+    resendConfirmation: function (email) {
+      return authFetch("/resend?redirect_to=" + encodeURIComponent(linkTarget()), {
+        type: "signup",
+        email: email
       });
     },
 
@@ -88,10 +103,79 @@
     },
 
     resetPassword: function (email) {
-      return authFetch("/recover", {
-        email: email,
-        options: { email_redirect_to: global.location.origin + "/auth.html?reset=1" }
+      return authFetch("/recover?redirect_to=" + encodeURIComponent(linkTarget()), {
+        email: email
       });
+    },
+
+    // Recovery hands back a session in the URL fragment; that session is the
+    // only authorization for setting the new password.
+    setPassword: function (password) {
+      var session = readSession();
+      if (!session || !session.access_token) {
+        return Promise.reject(new Error("no session"));
+      }
+      return fetch(authUrl("/user"), {
+        method: "PUT",
+        headers: {
+          apikey: config.SUPABASE_PUBLISHABLE_KEY,
+          Authorization: "Bearer " + session.access_token,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ password: password })
+      }).then(function (response) {
+        return response.json().catch(function () { return {}; }).then(function (data) {
+          if (!response.ok) {
+            var error = new Error(data.msg || data.error_description || data.message || "שגיאה");
+            error.status = response.status;
+            error.code = data.error_code || data.code;
+            throw error;
+          }
+          return data;
+        });
+      });
+    },
+
+    /* An emailed link comes back as a URL fragment, not a query string, and
+     * carries either a session or an error. Reading it is the only way to know
+     * which; ignoring it makes a confirmed account and an expired link look
+     * exactly alike. The fragment is removed afterwards so tokens do not sit in
+     * the address bar or in history.
+     */
+    readLinkResult: function () {
+      var raw = String(global.location.hash || "").replace(/^#/, "");
+      if (!raw) return null;
+
+      var fragment = new URLSearchParams(raw);
+      var error = fragment.get("error_code") || fragment.get("error");
+      var accessToken = fragment.get("access_token");
+      if (!error && !accessToken) return null;
+
+      try {
+        global.history.replaceState(null, "", global.location.pathname + global.location.search);
+      } catch (err) {
+        global.location.hash = "";
+      }
+
+      if (error) {
+        return {
+          kind: "error",
+          code: error,
+          type: fragment.get("type") || null,
+          description: fragment.get("error_description") || null
+        };
+      }
+
+      var expiresIn = parseInt(fragment.get("expires_in") || "3600", 10);
+      writeSession({
+        access_token: accessToken,
+        refresh_token: fragment.get("refresh_token"),
+        token_type: fragment.get("token_type") || "bearer",
+        expires_in: expiresIn,
+        expires_at: parseInt(fragment.get("expires_at") || "0", 10)
+          || Math.floor(Date.now() / 1000) + expiresIn
+      });
+      return { kind: "session", type: fragment.get("type") || "signup" };
     },
 
     refresh: function () {
