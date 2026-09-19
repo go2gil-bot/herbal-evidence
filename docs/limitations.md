@@ -17,6 +17,8 @@ anything about the platform.
 | AI drafts | Real `gpt-5.2` integration, strict output schema, validators on the way back |
 | Pilot | Four comprehension questions, pre and post, researcher-approved answer key |
 | Deployment | Two Railway environments, four services, branch wiring verified both ways |
+| Auth email | Brevo SMTP on both projects, a separate key each. A real confirmation email reached a real inbox from dev |
+| Auth links | Confirmation, expiry and recovery each land on a page that says which happened; an expired link can be resent |
 
 ## Blocked or not built
 
@@ -25,7 +27,7 @@ anything about the platform.
 | **Structured extraction (`extract` job)** | Needs full article text, which needs uploads | Storage buckets, an upload flow, then extraction into `evidence_items` |
 | **Article upload to Storage** | No buckets exist | Buckets with policies, an upload endpoint, provenance recording |
 | **Full-text reading** | Only abstracts and metadata are retrieved. `access_level` says `full_text` when the provider reports open access, but the text itself is not fetched or parsed | An open-access fetcher for PMC, within its terms |
-| **Auth emails at any volume** | Supabase's built-in sender is rate limited and documented as test-only | SMTP configured per project, plus Site URL and redirect allow-lists |
+| **A verified sending domain** | The sender is a free webmail address, so the recipient's DMARC check fails and mail can land in spam | A domain, then Brevo's DKIM/SPF records on it |
 | **Review repository reuse in the UI** | The API groups requests onto a research question and reuses review versions; no screen drives it | A "reuse this review" action in the editor |
 | **`extract` and `draft` from full text** | Both currently reason over titles and metadata only | Depends on the three items above |
 
