@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>כניסה והרשמה — Herbal Evidence</title>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+Hebrew:wght@400;600;700&family=Noto+Sans:wght@400;600&display=swap">
-  <link rel="stylesheet" href="styles.css?v=3">
+  <link rel="stylesheet" href="styles.css?v=4">
 </head>
 <body>
   <div class="env-banner" id="env-banner" hidden>סביבת פיתוח (dev) — הנתונים כאן אינם אמיתיים</div>
@@ -68,11 +68,35 @@
         </div>
         <button class="btn btn-primary" type="submit">שליחת קישור איפוס</button>
       </form>
+
+      <!-- Shown only after a recovery link brings back a session. -->
+      <form id="panel-newpassword" hidden>
+        <div class="field">
+          <label for="new-password">סיסמה חדשה</label>
+          <span class="hint">לפחות 8 תווים.</span>
+          <input type="password" id="new-password" autocomplete="new-password" minlength="8" required>
+        </div>
+        <button class="btn btn-primary" type="submit">שמירת הסיסמה</button>
+      </form>
+
+      <!-- Shown only when a link came back expired or already used. -->
+      <form id="panel-resend" hidden>
+        <div class="field">
+          <label for="resend-email">אימייל</label>
+          <span class="hint">נשלח קישור אימות חדש לאותה כתובת.</span>
+          <input type="email" id="resend-email" autocomplete="email" required>
+        </div>
+        <button class="btn btn-primary" type="submit">שליחת קישור חדש</button>
+      </form>
+
+      <p id="confirmed-continue" hidden>
+        <a class="btn btn-primary" href="dashboard.html">המשך לבקשות שלי</a>
+      </p>
     </div>
   </main>
 
   <script src="config.js"></script>
-  <script src="core.js?v=3"></script>
+  <script src="core.js?v=4"></script>
   <script>
     (function () {
       "use strict";
@@ -87,9 +111,6 @@
         noteBox.hidden = false;
       }
 
-      if (params.get("verified")) note("האימייל אומת. אפשר להיכנס.");
-      if (params.get("reset")) note("אפשר לקבוע סיסמה חדשה דרך הקישור שנשלח אליך במייל.");
-
       var tabs = ["login", "register", "reset"];
       tabs.forEach(function (name) {
         document.getElementById("tab-" + name).addEventListener("click", function () {
@@ -101,6 +122,37 @@
           });
         });
       });
+
+      /* An emailed link lands here carrying its outcome in the URL fragment.
+       * Reading it is the only way to tell a confirmed account from an expired
+       * link - both otherwise render an ordinary login form, which is what
+       * someone who followed a two-day-old link would see and misread as
+       * success.
+       */
+      function takeOverPanel(name) {
+        document.querySelector(".tabs").hidden = true;
+        tabs.concat(["newpassword", "resend"]).forEach(function (other) {
+          var panel = document.getElementById("panel-" + other);
+          if (panel) panel.hidden = other !== name;
+        });
+      }
+
+      var link = HE.auth.readLinkResult();
+      if (link && link.kind === "session" && link.type === "recovery") {
+        note("אפשר לקבוע עכשיו סיסמה חדשה.");
+        takeOverPanel("newpassword");
+      } else if (link && link.kind === "session") {
+        note("האימייל אומת. נכנסת לחשבון.");
+        takeOverPanel(null);
+        document.getElementById("confirmed-continue").hidden = false;
+      } else if (link && link.kind === "error") {
+        HE.showError(errorBox, link.code === "otp_expired"
+          ? "הקישור פג תוקף. אפשר לשלוח קישור חדש."
+          : "הקישור אינו תקין או שכבר נוצל. אפשר לשלוח קישור חדש.");
+        if (link.type !== "recovery") {
+          takeOverPanel("resend");
+        }
+      }
 
       function next() {
         var target = params.get("next");
@@ -147,6 +199,30 @@
           .catch(function () {
             note("אם קיים חשבון עם הכתובת הזו, נשלח אליו קישור לאיפוס.");
           });
+      });
+
+      document.getElementById("panel-newpassword").addEventListener("submit", function (event) {
+        event.preventDefault();
+        HE.clearError(errorBox);
+        HE.auth.setPassword(document.getElementById("new-password").value)
+          .then(function () {
+            location.href = "dashboard.html";
+          })
+          .catch(function (err) {
+            HE.showError(errorBox, err.message || "שמירת הסיסמה נכשלה.");
+          });
+      });
+
+      document.getElementById("panel-resend").addEventListener("submit", function (event) {
+        event.preventDefault();
+        HE.clearError(errorBox);
+        // Same message either way, so this cannot be used to discover which
+        // addresses are registered.
+        var done = function () {
+          note("אם קיים חשבון שממתין לאימות, נשלח אליו קישור חדש.");
+        };
+        HE.auth.resendConfirmation(document.getElementById("resend-email").value.trim())
+          .then(done).catch(done);
       });
     })();
   </script>
