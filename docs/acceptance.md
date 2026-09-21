@@ -75,6 +75,14 @@ until 2026-09-19 all three rendered the same plain login form:
 Checked against the deployed `dev` site, not only locally. The resend reports
 the same message whether or not the address exists.
 
+The chain was then verified with a **real link**, not a hand-written fragment:
+`admin/generate_link` with our `redirect_to`, followed with `curl`. It answers
+`303` to `https://frontend-dev-62e0.up.railway.app/auth.html` - our page, not
+the project's Site URL - with `access_token`, `refresh_token`, `expires_at`,
+`token_type` and `type=signup` in the fragment, which is the shape
+`readLinkResult` parses. The account's `email_confirmed_at` was set by that one
+request. Following an emailed link needs no manual step to verify.
+
 Not established: that mail reaches inboxes rather than spam folders at any
 volume. The sender is a free webmail address and fails the recipient's DMARC
 check - see `docs/limitations.md`.
