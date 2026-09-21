@@ -1,0 +1,20 @@
+# Appended to config.toml by scripts/auth-config.sh, and only when all four SMTP
+# variables are set.
+#
+# It lives in its own file because of what the CLI does with a missing variable:
+# `env(SMTP_HOST)` is passed through as the literal string "env(SMTP_HOST)" and
+# `enabled` still flips to true. Pushing that would enable SMTP with garbage
+# values and break sending outright - worse than leaving it off.
+#
+# Brevo relay settings. The login is the SMTP login Brevo shows (often
+# something@smtp-brevo.com), not the account email; the password is an SMTP key
+# generated in the dashboard, not the account password.
+
+[auth.email.smtp]
+enabled = true
+host = "env(SMTP_HOST)"
+port = 587
+user = "env(SMTP_USER)"
+pass = "env(SMTP_PASS)"
+admin_email = "env(SMTP_SENDER)"
+sender_name = "Herbal Evidence"

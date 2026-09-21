@@ -1,0 +1,51 @@
+# Declared configuration for the remote Supabase projects.
+#
+# `supabase config push` only applies what this file DECLARES; the ten or so
+# hosted properties it does not mention are left alone. That distinction is the
+# whole safety story here, so keep this file minimal and run
+# `supabase config diff --project-ref <ref>` before every push.
+#
+# Both projects share this file and differ only in the values below, which come
+# from the environment. Use scripts/auth-config.sh rather than exporting by hand.
+
+project_id = "env(SUPABASE_PROJECT_REF)"
+
+[auth]
+# Where a verification or recovery link lands. Supabase defaults this to
+# http://localhost:3000, which silently breaks every email in a deployed
+# environment - both projects were still on that default until 2026-09-17.
+site_url = "env(SITE_URL)"
+
+# Exact URLs a redirect may target. In production both entries are the same
+# production URL: a localhost entry must never appear in production's allow-list.
+additional_redirect_urls = ["env(REDIRECT_URL)", "env(REDIRECT_URL_ALT)"]
+
+jwt_expiry = 3600
+enable_signup = true
+
+[auth.email]
+enable_signup = true
+# A confirmed address is what ties a response to one person.
+enable_confirmations = true
+
+# --- SMTP -------------------------------------------------------------------
+#
+# NOT DECLARED YET, on purpose. Supabase's built-in sender is rate limited to a
+# handful of messages per hour and is documented as being for testing only, so
+# registration emails are unreliable until this is filled in.
+#
+# It stays commented out because a declared-but-empty SMTP block would be pushed
+# as empty and would break sending rather than leave it alone.
+#
+# To enable, uncomment and set the five variables in scripts/auth-config.sh (or
+# the environment), then run `scripts/auth-config.sh <env> diff` and read it
+# before pushing. SMTP_PASS is a secret: keep it in supabase/.env, never here.
+#
+# [auth.email.smtp]
+# enabled = true
+# host = "env(SMTP_HOST)"
+# port = 587
+# user = "env(SMTP_USER)"
+# pass = "env(SMTP_PASS)"
+# admin_email = "env(SMTP_SENDER)"
+# sender_name = "Herbal Evidence"

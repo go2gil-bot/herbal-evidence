@@ -1,6 +1,12 @@
 /* Herbal Evidence - calm research design system.
    Tokens follow the Stitch design system asset 602809031577218080. */
 
+/* Any `display` declaration beats the browser's own [hidden] rule, so a
+   flex or grid element stays on screen after JS hides it. Every panel here
+   is toggled with the attribute, so the guard is global rather than one
+   rule per component. */
+[hidden] { display: none !important; }
+
 :root {
   --green-700: #2f5144;
   --green-600: #3f6b5a;
@@ -58,7 +64,6 @@ body {
   padding: var(--space-1) var(--space-3);
   text-align: center;
 }
-.env-banner[hidden] { display: none; }
 
 /* --- header ----------------------------------------------------------- */
 .site-header {
