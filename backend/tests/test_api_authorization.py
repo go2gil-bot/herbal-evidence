@@ -243,3 +243,30 @@ def test_the_audit_event_does_not_carry_the_question(client_as_a, fake):
     assert audits, "no audit event was written"
     serialised = str(audits[0][2])
     assert "אבא" not in serialised and "כורכום" not in serialised
+
+
+def test_a_rate_limited_insert_becomes_429_not_a_generic_400(client_as_a, fake, monkeypatch):
+    """The limit is a database trigger, so the API's job is only to name it.
+
+    Without this mapping the refusal arrived as the same 400 as a malformed
+    payload, which tells the person to fix their input when there is nothing
+    wrong with it.
+    """
+    from app.services.supabase_client import SupabaseError
+
+    async def refuse(table, row, *, columns="*"):
+        if table == "requests":
+            raise SupabaseError(429, "PT429", "rate limit: 5 requests in the last hour")
+        return {"id": 1}
+
+    fake.rows["plant_aliases"] = []
+    monkeypatch.setattr(fake, "insert", refuse)
+
+    response = client_as_a.post("/api/v1/requests", json={"herb_input": "כורכום"})
+
+    assert response.status_code == 429
+    detail = response.json()["detail"]
+    assert detail["code"] == "too_many_requests"
+    # The person is told what to do, and the raw SQLSTATE text is not echoed.
+    assert "שעה" in detail["message"]
+    assert "PT429" not in detail["message"] and "rate limit" not in detail["message"]

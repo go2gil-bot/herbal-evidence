@@ -123,6 +123,18 @@ async def create_request(user: CurrentUser, client: Client, payload: RequestCrea
     try:
         created = await client.insert("requests", row, columns=REQUEST_COLUMNS)
     except SupabaseError as exc:
+        # The limit is a trigger, so it fires whether the insert came through
+        # this endpoint or straight from PostgREST. Saying which limit was hit
+        # would tell a script what to wait out; the message says an hour because
+        # that is the shorter of the two windows and the honest advice.
+        if exc.status_code == status.HTTP_429_TOO_MANY_REQUESTS:
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail={
+                    "code": "too_many_requests",
+                    "message": "שלחת הרבה בקשות בזמן קצר. אפשר לנסות שוב בעוד שעה.",
+                },
+            ) from exc
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail={"code": "request_rejected", "message": "לא ניתן היה לשמור את הבקשה"},
