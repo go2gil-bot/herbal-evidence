@@ -19,6 +19,7 @@ anything about the platform.
 | Deployment | Two Railway environments, four services, branch wiring verified both ways |
 | Auth email | Brevo SMTP on both projects, a separate key each. A real confirmation email reached a real inbox from dev |
 | Auth links | Confirmation, expiry and recovery each land on a page that says which happened; an expired link can be resent |
+| Submission limits | 5 per hour and 20 per day per person, enforced by a database trigger so skipping the API does not skip the limit |
 
 ## Blocked or not built
 
@@ -40,7 +41,6 @@ anything about the platform.
 | **The Dockerfiles locally** | Docker is not installed on the development machine. They build and run on Railway, which is the verification that matters, but a local `docker build` has never run |
 | **Production under real use** | Production is deployed, healthy and empty. Nobody has used it |
 | **Screen reader end to end** | Structural checks pass - labels, one exposed h1, focus outlines, RTL. No assistive technology has actually driven the app |
-| **Rate limits** | Not implemented. Nothing stops a signed-in user submitting requests in a loop |
 | **CSP** | Security headers are set (`nosniff`, `X-Frame-Options`, referrer policy) but no Content-Security-Policy header |
 
 ## Open decisions - not ours to invent

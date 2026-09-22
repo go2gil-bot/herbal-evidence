@@ -14,6 +14,7 @@ python supabase/tests/rls_isolation.py                   # 24 checks
 python supabase/tests/staff_flow.py                      # 12 checks
 python supabase/tests/literature_search.py               # 22 checks, hits real providers
 python supabase/tests/reuse_and_recovery.py              # 14 checks
+python supabase/tests/rate_limit.py                      # 7 checks
 
 # against the deployed backend instead of a local one
 API=https://backend-dev-001e.up.railway.app python supabase/tests/staff_flow.py
@@ -86,6 +87,23 @@ request. Following an emailed link needs no manual step to verify.
 Not established: that mail reaches inboxes rather than spam folders at any
 volume. The sender is a free webmail address and fails the recipient's DMARC
 check - see `docs/limitations.md`.
+
+## Submission limits, verified 2026-09-22
+
+`rate_limit.py`, against the live dev project. Every insert goes **straight to
+PostgREST with a real user's token**, because `authenticated` holds a direct
+insert grant on `requests` - a limit that only FastAPI enforces is not a limit.
+
+| Check | Result |
+|---|---|
+| First 5 in an hour accepted, 6th refused `429` | ✅ |
+| Stays refused | ✅ |
+| A different person is unaffected - the counter is per owner | ✅ |
+| 20th in a day accepted, 21st refused, with the hourly window not full | ✅ |
+
+Also `test_a_rate_limited_insert_becomes_429_not_a_generic_400` offline: the
+refusal reaches the person as 429 with Hebrew guidance, not as the same 400 a
+malformed payload gets, and the SQLSTATE text is not echoed back.
 
 ## What these tests do not establish
 
